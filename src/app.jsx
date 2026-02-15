@@ -20,9 +20,10 @@ import {
 
 // --- CONFIGURATION ---
 
-// 1. GEMINI API KEY
-// Explicitly using your provided key to ensure connection works
-const apiKey = process.env.GEMINI_API_KEY; 
+// 1. GEMINI API KEY (FIXED FOR VITE)
+// IMPORTANT: Create a .env file with VITE_GEMINI_API_KEY=your_key 
+// OR replace "YOUR_API_KEY_HERE" below with your actual key string.
+const apiKey = import.meta.env.GEMINI_API_KEY || "AIzaSyCyo02bUMdw_6x7-kCzOHCOiKYMmZLJ-R0";
 
 // 2. FIREBASE CONFIGURATION
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -61,16 +62,17 @@ const getHybridUserId = (email) => {
 
 // --- GEMINI API HELPER ---
 const callGemini = async (prompt, systemInstruction = "") => {
-  // Using the hardcoded key to guarantee connection
-  const effectiveKey = apiKey; 
-  
-  // Models to try - added gemini-1.5-pro as a robust fallback
-  const models = ["gemini-1.5-flash", "gemini-2.5-flash-preview-09-2025", "gemini-pro"];
+  if (!apiKey || apiKey === "YOUR_API_KEY_HERE") {
+    return "⚠️ Configuration Error: Please add your Gemini API Key in app.jsx (Line 24).";
+  }
+
+  // Updated models to standard supported versions
+  const models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
 
   for (const model of models) {
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -87,10 +89,9 @@ const callGemini = async (prompt, systemInstruction = "") => {
       );
 
       if (!response.ok) {
-        // Log detailed error for debugging
         const errText = await response.text();
         console.warn(`Model ${model} failed (${response.status}):`, errText);
-        continue; 
+        continue; // Try next model
       }
 
       const data = await response.json();
@@ -100,7 +101,7 @@ const callGemini = async (prompt, systemInstruction = "") => {
     }
   }
   
-  throw new Error("Unable to connect to AI. Please check internet.");
+  throw new Error("Unable to connect to AI. Please check internet or API Key.");
 };
 
 // --- LOCALIZATION ---
@@ -197,7 +198,7 @@ const LANGUAGES = {
   }
 };
 
-// --- FULL 40 UNIQUE SJT QUESTIONS (Restored) ---
+// --- FULL 40 UNIQUE SJT QUESTIONS ---
 const FULL_SJT = [
     // --- CONSCIENTIOUSNESS (20 Items) ---
     { id: 1, trait: 'C', text_en: "It's Thursday evening, and you have a major biology assignment due on Monday morning. Your friends just messaged you in the group chat about a spontaneous weekend trip to the beach that starts tomorrow morning. You haven't started the assignment yet.", text_ar: "النهارده الخميس بالليل، وعندك واجب أحياء كبير لازم يتسلم الاثنين الصبح. صحابك بعتولك على الجروب إنهم طالعين رحلة للعين السخنة بكرة الصبح، وأنت لسه مابدأتش في الواجب خالص.", options_en: ["Decline the trip immediately to ensure the assignment is finished with high quality.", "Go on the trip but wake up early Sunday to rush through the work.", "Take your laptop and books with you, planning to work during the trip.", "Go on the trip and decide to copy the assignment from a friend later."], options_ar: ["أعتذر عن الرحلة فوراً عشان أضمن إني أخلص الواجب بجودة عالية.", "أطلع الرحلة بس أصحى بدري يوم الأحد أكروته.", "آخد اللابتوب والكتب معايا بنية إني أذاكر هناك.", "أطلع الرحلة وأبقى أنقل الواجب من حد صاحبي بعدين."] },
@@ -235,7 +236,7 @@ const FULL_SJT = [
     { id: 31, trait: 'O', text_en: "You are reading a book. Do you prefer:", text_ar: "بتقرأ كتاب. تفضل إيه؟", options_en: ["Science fiction or deep philosophy.", "Biographies of famous people.", "Action/Adventure.", "I don't like reading."], options_ar: ["خيال علمي أو فلسفة عميقة.", "سير ذاتية لمشاهير.", "أكشن ومغامرة.", "مبحبش القراءة."] },
     { id: 32, trait: 'O', text_en: "Someone suggests watching a documentary about the origin of the universe.", text_ar: "حد اقترح تتفرجوا على وثائقي عن نشأة الكون.", options_en: ["Sounds fascinating, let's watch.", "Okay, I'll watch it.", "Sounds boring.", "I'd rather watch a comedy."], options_ar: ["شكلها مذهلة، يلا نتفرج.", "ماشي، هتفرج.", "شكلها مملة.", "أفضل أتفرج على كوميدي."] },
     { id: 33, trait: 'O', text_en: "You have to write an essay. The teacher gives you a choice of topics.", text_ar: "لازم تكتب مقال. المدرس خيرك بين موضوعين.", options_en: ["'What if humans could fly?' (Creative)", "'My Summer Vacation' (Factual)", "Ask the teacher for an easier topic.", "Copy something from the internet."], options_ar: ["'ماذا لو البشر بيطيروا؟' (إبداعي)", "'أجازتي الصيفية' (واقعي)", "أطلب موضوع أسهل.", "أنقل حاجة من النت."] },
-    { id: 34, trait: 'O', text_en: "You see a device you've never seen before.", text_ar: "شفت جهاز عمرك ما شفته قبل كده.", options_en: ["Try to figure out how it works and take it apart if possible.", "Read the manual.", "Ask someone what it does.", "Ignore it."], options_ar: ["أحاول أفهم بيشتغل ازاي وأفكه لو ينفع.", "أقرا الكتالوج.", "أسأل حد ده بيعمل إيه.", "أطنشه."] },
+    { id: 34, trait: 'O', text_en: "You see a device you've never seen before.", text_ar: "شفت جهاز عمرك ما شفته قبل كده.", options_en: ["Try to figure out how it works and take it apart if possible.", "Read the manual.", "Ask someone what it does.", "Ignore it."], options_ar: ["أحاول أفهم بيشتغل ازاي وأفكه لو ينفع.", "أقرا الكتالوج.", "أسأل حد ده بيعمل إيه.", "أطنش."] },
     { id: 35, trait: 'O', text_en: "Do you enjoy discussions about theoretical problems that have no correct answer?", text_ar: "بتستمتع بالمناقشات عن مشاكل نظرية ملهاش حل صح؟", options_en: ["Love them; they stimulate my mind.", "They are okay sometimes.", "No, I prefer practical problems.", "Hate them; they are pointless."], options_ar: ["بحبها جداً؛ بتشغل مخي.", "ماشي حالها ساعات.", "لأ، بفضل المشاكل العملية.", "بكرهها؛ ملهاش فايدة."] },
     { id: 36, trait: 'O', text_en: "A friend invites you to a poetry slam (people reading poems).", text_ar: "صاحبك عزمك على أمسية شعرية.", options_en: ["Go enthusiastically to hear the metaphors.", "Go just to hang out with the friend.", "Politely decline.", "Laugh at the idea."], options_ar: ["أروح بحماس عشان أسمع التشبيهات.", "أروح بس عشان أخرج مع صاحبي.", "أرفض بذوق.", "أضحك على الفكرة."] },
     { id: 37, trait: 'O', text_en: "When you are in nature, do you stop to look at details like shapes of leaves?", text_ar: "لما بتكون في الطبيعة، بتقف تتأمل تفاصيل زي شكل ورق الشجر؟", options_en: ["Yes, I often find beauty in small details.", "Sometimes.", "Rarely, I just walk.", "Never."], options_ar: ["آه، غالباً بلاقي جمال في التفاصيل الصغيرة.", "أحياناً.", "نادراً، بمشي وخلاص.", "أبداً."] },
@@ -477,7 +478,7 @@ const AuthScreen = ({ t, onLogin }) => {
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t.password} className="bg-transparent outline-none flex-1 font-medium text-slate-700" required />
           </div>
           <button type="submit" disabled={isLoading} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 hover:shadow-lg hover:shadow-slate-900/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70">
-            {isLoading ? <RefreshCw className="animate-spin"/> : (isLogin ? t.login_btn : t.signup_btn)}
+            {isLoading ? <RefreshCw className="animate-spin"/> : (isLogin ? t.login_btn : t.login_btn)}
           </button>
         </form>
         <div className="my-6 flex items-center gap-4"><div className="h-px bg-slate-100 flex-1"></div><span className="text-xs text-slate-300 uppercase font-bold tracking-widest">OR</span><div className="h-px bg-slate-100 flex-1"></div></div>
@@ -890,5 +891,3 @@ const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
     </div>
   );
 }
-
-
