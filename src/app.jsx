@@ -20,9 +20,8 @@ import {
 
 // --- CONFIGURATION ---
 
-// 1. GEMINI API KEY (FIXED FOR VITE)
-// IMPORTANT: Create a .env file with VITE_GEMINI_API_KEY=your_key 
-// OR replace "YOUR_API_KEY_HERE" below with your actual key string.
+// 1. GEMINI API KEY
+// Ensure this key has the "Generative Language API" enabled in Google Cloud Console.
 const apiKey = "AIzaSyCyo02bUMdw_6x7-kCzOHCOiKYMmZLJ-R0";
 
 // 2. FIREBASE CONFIGURATION
@@ -60,14 +59,16 @@ const getHybridUserId = (email) => {
   return email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
 };
 
-// --- GEMINI API HELPER ---
-const callGemini = async (prompt, systemInstruction = "") => {
-  if (!apiKey || apiKey === "YOUR_API_KEY_HERE") {
-    return "⚠️ Configuration Error: Please add your Gemini API Key in app.jsx (Line 24).";
+// --- GEMINI API HELPER (FIXED) ---
+// Now accepts 'history' array instead of single prompt
+const callGemini = async (history, systemInstruction = "") => {
+  if (!apiKey || apiKey.includes("YOUR_API_KEY")) {
+    return "⚠️ Error: API Key is missing in app.jsx.";
   }
 
-  // Updated models to standard supported versions
-  const models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+  // FIXED: Removed 'gemini-pro' (1.0) because it crashes with systemInstruction.
+  // Kept only 1.5 models which support the features used here.
+  const models = ["gemini-1.5-flash", "gemini-1.5-pro"];
 
   for (const model of models) {
     try {
@@ -77,13 +78,17 @@ const callGemini = async (prompt, systemInstruction = "") => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ 
-              role: "user",
-              parts: [{ text: prompt }] 
-            }],
+            contents: history, // Passing full conversation context
             systemInstruction: {
               parts: [{ text: systemInstruction }]
-            }
+            },
+            // Added safety settings to prevent silent blocks
+            safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+            ]
           })
         }
       );
@@ -95,13 +100,13 @@ const callGemini = async (prompt, systemInstruction = "") => {
       }
 
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "Thinking...";
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "(No response generated)";
     } catch (e) {
       console.warn(`Connection error on ${model}:`, e);
     }
   }
   
-  throw new Error("Unable to connect to AI. Please check internet or API Key.");
+  throw new Error("Unable to connect to AI. Please check internet or API Key quota.");
 };
 
 // --- LOCALIZATION ---
@@ -345,7 +350,8 @@ export default function SyntraApp() {
           Mention their traits (C:${profileData.c_score}, O:${profileData.o_score}). 
           LANGUAGE: ${lang === 'ar' ? 'Egyptian Arabic' : 'English'}.`;
         
-        const emailBody = await callGemini(welcomePrompt);
+        // Note: For simple one-off prompts like this, we wrap it in basic array
+        const emailBody = await callGemini([{ role: 'user', parts: [{ text: welcomePrompt }] }]);
         
         await addDoc(collection(db, 'artifacts', appId, 'users', activeUserId, 'inbox'), {
           subject: t.welcome_subject,
@@ -645,6 +651,7 @@ const NavIcon = ({ icon, active, onClick }) => (
 
 // --- MODULES ---
 
+// --- CHAT MODULE (FIXED) ---
 const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState('');
@@ -658,6 +665,7 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
     const q = query(collection(db, 'artifacts', appId, 'users', userId, 'chat'));
     const unsub = onSnapshot(q, (snap) => {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort by timestamp
         data.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
         setMsgs(data);
     }, (err) => console.log("Chat Offline", err));
@@ -683,7 +691,7 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
     setInput('');
     setLoading(true);
 
-    // 1. Optimistic Update (Show user msg immediately)
+    // 1. Optimistic Update
     if (!isOffline) {
         await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), {
             role: 'user', text, createdAt: serverTimestamp()
@@ -693,10 +701,10 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
     }
 
     try {
-        // 2. Prepare Context
+        // 2. Prepare Context (Tasks)
         const taskListString = currentTasks.map(t => `- ${t.text} (ID: ${t.id})`).join('\n');
         
-        // 3. Strict System Prompt for Egyptian Arabic
+        // 3. System Prompt
         const systemPrompt = `
           IDENTITY: You are "Aura", a sophisticated AI mentor using the BIG-5 personality model.
           USER PROFILE: Name: ${profile.name}, Age: ${profile.age}, C:${profile.c_score}, O:${profile.o_score}.
@@ -714,11 +722,22 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
           - Keep responses concise and encouraging.
         `;
 
-        // 4. Call AI
-        const aiRaw = await callGemini(text, systemPrompt);
+        // 4. PREPARE HISTORY FOR API (FIXED)
+        // Map local history to API format { role, parts: [{ text }] }
+        // Note: The API uses 'model' for AI role, but we store as 'ai'.
+        const apiHistory = msgs.map(m => ({
+            role: m.role === 'ai' ? 'model' : 'user',
+            parts: [{ text: m.text }]
+        }));
+        
+        // Add current message to history
+        apiHistory.push({ role: 'user', parts: [{ text }] });
+
+        // 5. Call AI with Full History
+        const aiRaw = await callGemini(apiHistory, systemPrompt);
         let aiText = aiRaw;
         
-        // 5. Parse Commands (ADD/MOD)
+        // 6. Parse Commands (ADD/MOD)
         const modMatch = aiRaw.match(/\[MOD:\s*(.*?)\s*->\s*(.*?)\]/);
         if (modMatch) {
             const oldText = modMatch[1].trim();
@@ -742,7 +761,7 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
             }
         }
 
-        // 6. Save Response
+        // 7. Save Response
         if (!isOffline) {
             await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), {
                 role: 'ai', text: aiText, createdAt: serverTimestamp()
@@ -752,7 +771,6 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
         }
 
     } catch (e) {
-        // Show error message in chat if AI fails
         const errMsg = e.message || (lang === 'ar' ? "معلش في مشكلة في الاتصال، حاول تاني." : "Connection failed. Please check internet.");
         
         if (!isOffline) {
@@ -835,7 +853,8 @@ const PlannerModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   const magicBreakdown = async () => {
     if (!newTask.trim()) return;
     setIsMagicLoading(true);
-    const result = await callGemini(`Break down goal "${newTask}" into 3 steps. Language: ${lang === 'ar' ? 'Egyptian Arabic' : 'English'}. Return steps joined by |||`);
+    // Wrap single prompt in array for the new callGemini signature
+    const result = await callGemini([{ role: 'user', parts: [{ text: `Break down goal "${newTask}" into 3 steps. Language: ${lang === 'ar' ? 'Egyptian Arabic' : 'English'}. Return steps joined by |||` }] }]);
     const subtasks = result.split('|||').map(s => s.trim()).filter(s => s);
     for (const st of subtasks) await addTask(st, 'ai-magic');
     setNewTask('');
@@ -875,7 +894,8 @@ const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
   const [insight, setInsight] = useState('');
   const analyze = async () => {
     if(entry.length < 10) return;
-    const res = await callGemini(`Analyze journal: "${entry}". Give 1 sentence advice in ${lang === 'ar' ? 'Egyptian Arabic' : 'English'}.`);
+    // Wrap single prompt in array for the new callGemini signature
+    const res = await callGemini([{ role: 'user', parts: [{ text: `Analyze journal: "${entry}". Give 1 sentence advice in ${lang === 'ar' ? 'Egyptian Arabic' : 'English'}.` }] }]);
     setInsight(res);
   }
   return (
@@ -891,4 +911,3 @@ const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
     </div>
   );
 }
-
