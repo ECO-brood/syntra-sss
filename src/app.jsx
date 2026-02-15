@@ -23,7 +23,7 @@ import {
 // --- CONFIGURATION ---
 
 // 1. OPENROUTER API KEY
-const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "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";
+const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "AIzaSyAapzo5hjssy4xVHIZ3dVGHHVW31tMiRz4";
 
 // 2. MODEL SELECTION
 const AI_MODEL = "openai/gpt-4o"; 
@@ -815,3 +815,4 @@ const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
         </div>
     );
 };
+
