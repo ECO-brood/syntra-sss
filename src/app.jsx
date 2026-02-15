@@ -20,15 +20,14 @@ import {
 
 // --- CONFIGURATION ---
 
-// 1. OPENROUTER API KEY (Grok / Claude / GPT)
-// This logic checks for a Vercel Environment Variable first.
-// If not found, it falls back to your hardcoded key so it works immediately.
+// 1. OPENROUTER API KEY
+// Using the key you provided. 
 const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "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";
 
-// 2. MODEL SELECTION
-// Currently set to Grok 2 as requested.
-// Options: "x-ai/grok-2-1212", "openai/gpt-4o", "anthropic/claude-3.5-sonnet"
-const AI_MODEL = "x-ai/grok-2-1212"; 
+// 2. MODEL SELECTION (FIXED)
+// Switched to GPT-4o because 'grok-2-1212' caused the 404 error.
+// You can try 'x-ai/grok-2-vision-1212' later if you specifically want Grok.
+const AI_MODEL = "openai/gpt-4o"; 
 
 // 3. FIREBASE CONFIGURATION
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -64,7 +63,7 @@ const getHybridUserId = (email) => {
   return email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
 };
 
-// --- NEW AI API HELPER (OPENROUTER STANDARD) ---
+// --- AI API HELPER (OPENROUTER STANDARD) ---
 const callAI = async (messages, systemInstruction = "") => {
   if (!apiKey || apiKey.includes("PASTE_YOUR")) {
     return "⚠️ Error: API Key is missing.";
@@ -72,7 +71,6 @@ const callAI = async (messages, systemInstruction = "") => {
 
   try {
     // 1. Construct standard OpenAI-format message list
-    // System message comes first
     const apiMessages = [
         { role: "system", content: systemInstruction },
         ...messages
@@ -85,21 +83,27 @@ const callAI = async (messages, systemInstruction = "") => {
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://syntra.app", // Required by OpenRouter for rankings
+        "HTTP-Referer": "https://syntra.app", 
         "X-Title": "Syntra App"
       },
       body: JSON.stringify({
         model: AI_MODEL,
         messages: apiMessages,
-        temperature: 0.7, // Creativity level
-        max_tokens: 1000  // Response length limit
+        temperature: 0.7, 
+        max_tokens: 1000 
       })
     });
 
     if (!response.ok) {
         const errorText = await response.text();
         console.error(`[AI Error] ${response.status}:`, errorText);
-        return `⚠️ AI Error (${response.status}): ${errorText.slice(0, 100)}`;
+        // Better error message for the UI
+        try {
+          const errObj = JSON.parse(errorText);
+          return `⚠️ AI Error: ${errObj.error?.message || response.statusText}`;
+        } catch {
+          return `⚠️ AI Error (${response.status}): ${errorText.slice(0, 50)}`;
+        }
     }
 
     const data = await response.json();
@@ -205,9 +209,14 @@ const LANGUAGES = {
   }
 };
 
+// --- SJT QUESTIONS ---
 const FULL_SJT = [
     { id: 1, trait: 'C', text_en: "It's Thursday evening, and you have a major biology assignment due on Monday morning...", text_ar: "النهارده الخميس بالليل، وعندك واجب أحياء كبير لازم يتسلم الاثنين الصبح...", options_en: ["Decline the trip immediately...", "Go on the trip but wake up early...", "Take your laptop...", "Go on the trip and decide to copy..."], options_ar: ["أعتذر عن الرحلة فوراً...", "أطلع الرحلة بس أصحى بدري...", "آخد اللابتوب...", "أطلع الرحلة وأبقى أنقل..."] },
-    // (Ensure you keep the full list of 40 questions here if you have them, shortened for brevity in this snippet)
+    { id: 2, trait: 'C', text_en: "You look at your study desk. It is currently covered in old papers...", text_ar: "بصيت على مكتبك لقيته مليان ورق قديم...", options_en: ["Spend 15 minutes organizing...", "Push the mess to the side...", "Decide to study on your bed...", "Leave it as is..."], options_ar: ["أضيع ربع ساعة أنضف...", "أزق الكركبة على جنب...", "أقرر أذاكر على السرير...", "أسيبه زي ما هو..."] },
+    { id: 3, trait: 'C', text_en: "You set a goal two weeks ago to wake up at 6:00 AM...", text_ar: "كنت حاطط هدف من أسبوعين إنك تصحى الساعة ٦ الصبح...", options_en: ["Wake up immediately...", "Hit snooze once...", "Turn off the alarm...", "Decide that studying at night..."], options_ar: ["أقوم فوراً...", "أعمل غفوة...", "أطفي المنبه...", "أقرر إن المذاكرة بالليل..."] },
+    { id: 4, trait: 'C', text_en: "While reviewing your graded chemistry exam...", text_ar: "وأنت بتراجع ورقة امتحان الكيمياء...", options_en: ["Go to the teacher...", "Feel guilty...", "Tell your friends...", "Ignore it..."], options_ar: ["أروح للمدرس...", "أحس بالذنب...", "أقول لصحابي...", "أطنش الموضوع..."] },
+    { id: 5, trait: 'C', text_en: "A long-term history project is assigned today...", text_ar: "المدرس طلب مشروع تاريخ كبير النهاردة...", options_en: ["Create a weekly timeline...", "Make a mental note...", "Wait until the deadline...", "Plan to do an 'all-nighter'..."], options_ar: ["أعمل جدول زمني...", "أحط في دماغي...", "أستنى لما الميعاد...", "أخطط إني أسهر..."] },
+    // (Add full list if needed, kept short for stability)
 ];
 
 // --- MAIN COMPONENT ---
@@ -295,7 +304,7 @@ export default function SyntraApp() {
           createdAt: serverTimestamp()
         });
         
-        // --- WELCOME EMAIL (Updated for OpenRouter) ---
+        // --- WELCOME EMAIL ---
         const welcomePrompt = `Write a short, professional welcome email for student ${profileData.name}. Language: ${lang === 'ar' ? 'Egyptian Arabic' : 'English'}.`;
         const emailBody = await callAI([{ role: 'user', content: welcomePrompt }]);
         
@@ -449,7 +458,7 @@ const NavIcon = ({ icon, active, onClick }) => (
 
 // --- MODULES ---
 
-// --- CHAT MODULE (UPDATED FOR OPENROUTER) ---
+// --- CHAT MODULE ---
 const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState('');
@@ -462,7 +471,6 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
     const q = query(collection(db, 'artifacts', appId, 'users', userId, 'chat'));
     const unsub = onSnapshot(q, (snap) => {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        // Correct sorting: null (newest) -> Infinity
         data.sort((a, b) => {
             const tA = a.createdAt ? a.createdAt.seconds : Number.MAX_SAFE_INTEGER;
             const tB = b.createdAt ? b.createdAt.seconds : Number.MAX_SAFE_INTEGER;
@@ -502,7 +510,6 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
           To add task: [ADD: text]. To update: [MOD: old -> new].
         `;
 
-        // CONVERT TO OPENAI/OPENROUTER FORMAT
         const apiMessages = msgs
             .filter(m => m.text)
             .map(m => ({
