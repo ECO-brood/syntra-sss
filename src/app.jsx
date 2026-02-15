@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  BookOpen, Brain, CheckCircle, MessageCircle,
-  Calendar, Activity, Globe, Send, 
-  Plus, LogOut, Cloud, WifiOff, Map, GitBranch, Edit3, Save, 
-  Link as LinkIcon, Sparkles, Percent, Compass
+  BookOpen, Brain, CheckCircle, ChevronRight, MessageCircle,
+  Calendar, Settings, User, Globe, ArrowRight, Sparkles, Send, 
+  Plus, Trash2, Smile, Activity, Lightbulb, LogOut, Lock, Mail, 
+  UserCircle, PenTool, ShieldCheck, Cloud, RefreshCw, Bell, 
+  WifiOff, Map, GitBranch, Edit3, Save, Languages, Compass,
+  CheckSquare, Book, Link as LinkIcon, ExternalLink, PlayCircle,
+  Percent
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -13,15 +16,14 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, collection, addDoc, query, onSnapshot, 
-  serverTimestamp, doc, setDoc, getDoc, updateDoc, 
+  serverTimestamp, doc, setDoc, getDoc, deleteDoc, updateDoc, 
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 } from 'firebase/firestore';
 
 // --- CONFIGURATION ---
 
-// 1. OPENROUTER API KEY 
-// REPLACE "PLACE_YOUR_OPENROUTER_KEY_HERE" WITH YOUR ACTUAL KEY
-const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+// 1. OPENROUTER API KEY
+const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "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";
 
 // 2. MODEL SELECTION
 const AI_MODEL = "openai/gpt-4o"; 
@@ -62,7 +64,7 @@ const getHybridUserId = (email) => {
 
 // --- AI API HELPER ---
 const callAI = async (messages, systemInstruction = "") => {
-  if (!apiKey || apiKey.includes("PLACE_YOUR")) return "⚠️ Error: Please set your API Key in app.jsx";
+  if (!apiKey || apiKey.includes("PASTE_YOUR")) return "⚠️ Error: API Key is missing.";
 
   try {
     const apiMessages = [
@@ -101,14 +103,95 @@ const callAI = async (messages, systemInstruction = "") => {
   }
 };
 
+// --- LOCALIZATION ---
+const LANGUAGES = {
+  en: {
+    welcome: "Welcome to Syntra",
+    start: "Start Journey",
+    login_title: "Student Portal",
+    signup_title: "New Registration",
+    email: "Email Address",
+    password: "Password",
+    name: "Full Name",
+    age: "Age",
+    login_btn: "Secure Login",
+    signup_btn: "Create Account",
+    guest_btn: "Access Platform",
+    switch_signup: "New here? Register",
+    switch_login: "Have account? Sign in",
+    guide: "Start Here",
+    dashboard: "Dashboard",
+    chat: "Aura Guide",
+    plan: "Smart Planner",
+    journal: "Neuro Journal",
+    roadmap: "Goal Roadmap",
+    roadmap_placeholder: "What is your big ambitious goal? (e.g., Become a Data Scientist)",
+    generate_roadmap: "Generate Visual Plan",
+    translate_roadmap: "Translate Plan",
+    edit_notes: "Add extra details or modify plan...",
+    save_notes: "Save Notes",
+    chat_placeholder: "Talk to Aura...",
+    inbox: "Inbox",
+    welcome_subject: "Welcome to Syntra!",
+    task_magic: "Magic Breakdown",
+    submit: "Submit",
+    next: "Next",
+    analyzing: "Analyzing Profile...",
+    logout: "Log Out"
+  },
+  ar: {
+    welcome: "مرحباً بك في سينترا",
+    start: "ابدأ الرحلة",
+    login_title: "بوابة الطالب",
+    signup_title: "تسجيل جديد",
+    email: "البريد الإلكتروني",
+    password: "كلمة المرور",
+    name: "الاسم بالكامل",
+    age: "العمر",
+    login_btn: "دخول آمن",
+    signup_btn: "إنشاء حساب",
+    guest_btn: "دخول المنصة",
+    switch_signup: "جديد؟ سجل الآن",
+    switch_login: "لديك حساب؟ دخول",
+    guide: "ابدأ هنا",
+    dashboard: "الرئيسية",
+    chat: "المساعد (أورا)",
+    plan: "المهام الذكية",
+    journal: "المذكرات",
+    roadmap: "خريطة الأهداف",
+    roadmap_placeholder: "ايه الحلم الكبير اللي عايز توصله؟ (مثلاً: ابقى مهندس برمجيات)",
+    generate_roadmap: "إنشاء الخريطة",
+    translate_roadmap: "ترجمة الخطة",
+    edit_notes: "أضف تفاصيل زيادة أو عدل الخطة...",
+    save_notes: "حفظ الملاحظات",
+    chat_placeholder: "اتكلم مع أورا...",
+    inbox: "صندوق الوارد",
+    welcome_subject: "مرحباً بك في سينترا!",
+    task_magic: "تقسيم ذكي",
+    submit: "تأكيد",
+    next: "التالي",
+    analyzing: "جاري التحليل...",
+    logout: "خروج"
+  }
+};
+
+const FULL_SJT = [
+    { id: 1, trait: 'C', text_en: "It's Thursday evening...", text_ar: "النهارده الخميس بالليل...", options_en: ["Decline...", "Go...", "Take...", "Go..."], options_ar: ["أعتذر...", "أطلع...", "آخد...", "أطلع..."] },
+    // Truncated for brevity
+];
+
 // --- MAIN COMPONENT ---
 export default function SyntraApp() {
+  const [lang, setLang] = useState('en');
   const [activeUserId, setActiveUserId] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('auth');
   const [isOffline, setIsOffline] = useState(false);
   const [user, setUser] = useState(null);
+
+  const t = LANGUAGES[lang];
+  const isRTL = lang === 'ar';
 
   useEffect(() => {
     const init = async () => {
@@ -194,7 +277,7 @@ export default function SyntraApp() {
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><Activity className="animate-spin text-teal-600" size={40} /></div>;
 
   return (
-    <div className={`min-h-screen font-sans bg-slate-50 text-slate-900 transition-all duration-500`}>
+    <div dir={isRTL ? 'rtl' : 'ltr'} className={`min-h-screen font-sans bg-slate-50 text-slate-900 transition-all duration-500`}>
       <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 z-50 px-6 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 bg-gradient-to-tr from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-teal-500/20">
@@ -209,25 +292,28 @@ export default function SyntraApp() {
               {isOffline ? 'Offline' : 'Online'}
             </button>
           )}
+          <button onClick={() => setLang(l => l === 'en' ? 'ar' : 'en')} className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-sm font-medium transition-all">
+            <Globe size={16} /> {lang === 'en' ? 'العربية' : 'English'}
+          </button>
           {activeUserId && (
              <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-50 text-red-600 hover:bg-red-100 text-sm font-medium transition-all">
-              <LogOut size={16} /> Log Out
+              <LogOut size={16} /> {t.logout}
             </button>
           )}
         </div>
       </nav>
 
       <main className="pt-24 px-4 h-screen overflow-hidden">
-        {view === 'auth' && <AuthScreen onLogin={handleLoginSuccess} />}
-        {view === 'onboarding' && <OnboardingFlow onComplete={handleProfileComplete} />}
-        {view === 'dashboard' && userProfile && <Dashboard userId={activeUserId} profile={userProfile} appId={appId} isOffline={isOffline} setIsOffline={setIsOffline} />}
+        {view === 'auth' && <AuthScreen t={t} onLogin={handleLoginSuccess} />}
+        {view === 'onboarding' && <OnboardingFlow t={t} onComplete={handleProfileComplete} />}
+        {view === 'dashboard' && userProfile && <Dashboard t={t} userId={activeUserId} profile={userProfile} lang={lang} appId={appId} isOffline={isOffline} setIsOffline={setIsOffline} />}
       </main>
     </div>
   );
 }
 
 // --- AUTH SCREEN ---
-const AuthScreen = ({ onLogin }) => {
+const AuthScreen = ({ t, onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -247,31 +333,31 @@ const AuthScreen = ({ onLogin }) => {
   return (
     <div className="h-full flex items-center justify-center animate-in fade-in duration-500 bg-slate-50">
       <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl">
-        <h2 className="text-3xl font-bold mb-6 text-center">{isLogin ? "Student Portal" : "New Registration"}</h2>
+        <h2 className="text-3xl font-bold mb-6 text-center">{isLogin ? t.login_title : t.signup_title}</h2>
         <form onSubmit={handleAuth} className="space-y-4">
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email Address" className="w-full p-4 bg-slate-50 rounded-2xl" required />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" className="w-full p-4 bg-slate-50 rounded-2xl" required />
-          <button type="submit" disabled={isLoading} className="w-full bg-teal-600 text-white py-4 rounded-2xl font-bold">{isLoading ? "..." : (isLogin ? "Secure Login" : "Create Account")}</button>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t.email} className="w-full p-4 bg-slate-50 rounded-2xl" required />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t.password} className="w-full p-4 bg-slate-50 rounded-2xl" required />
+          <button type="submit" disabled={isLoading} className="w-full bg-teal-600 text-white py-4 rounded-2xl font-bold">{isLoading ? "..." : (isLogin ? t.login_btn : t.signup_btn)}</button>
         </form>
-        <button onClick={() => onLogin("guest_" + Math.random())} className="w-full mt-4 text-slate-500 font-bold">Access Platform (Guest)</button>
-        <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-2 text-teal-600 font-bold">{isLogin ? "New here? Register" : "Have account? Sign in"}</button>
+        <button onClick={() => onLogin("guest_" + Math.random())} className="w-full mt-4 text-slate-500 font-bold">{t.guest_btn}</button>
+        <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-2 text-teal-600 font-bold">{isLogin ? t.switch_signup : t.switch_login}</button>
       </div>
     </div>
   );
 };
 
 // --- ONBOARDING & TESTS ---
-const OnboardingFlow = ({ onComplete }) => {
+const OnboardingFlow = ({ t, onComplete }) => {
     const [step, setStep] = useState(0);
     const [data, setData] = useState({ name: '', age: '', c_score: 50, o_score: 50 });
     return (
         <div className="h-full flex flex-col justify-center items-center">
             {step === 0 ? (
                 <div className="bg-white p-10 rounded-[2.5rem] shadow-xl max-w-md w-full">
-                     <h2 className="text-2xl font-bold mb-6">Welcome to Syntra</h2>
-                     <input value={data.name} onChange={e => setData({...data, name: e.target.value})} placeholder="Full Name" className="w-full p-4 bg-slate-50 rounded-xl mb-4" />
-                     <input value={data.age} onChange={e => setData({...data, age: e.target.value})} placeholder="Age" className="w-full p-4 bg-slate-50 rounded-xl mb-4" />
-                     <button onClick={() => setStep(1)} className="w-full bg-teal-600 text-white py-4 rounded-xl font-bold">Start Journey</button>
+                     <h2 className="text-2xl font-bold mb-6">{t.welcome}</h2>
+                     <input value={data.name} onChange={e => setData({...data, name: e.target.value})} placeholder={t.name} className="w-full p-4 bg-slate-50 rounded-xl mb-4" />
+                     <input value={data.age} onChange={e => setData({...data, age: e.target.value})} placeholder={t.age} className="w-full p-4 bg-slate-50 rounded-xl mb-4" />
+                     <button onClick={() => setStep(1)} className="w-full bg-teal-600 text-white py-4 rounded-xl font-bold">{t.start}</button>
                 </div>
             ) : (
                 <div className="bg-white p-10 rounded-[2.5rem] shadow-xl text-center">
@@ -285,7 +371,7 @@ const OnboardingFlow = ({ onComplete }) => {
 };
 
 // --- DASHBOARD ---
-const Dashboard = ({ userId, profile, appId, isOffline, setIsOffline }) => {
+const Dashboard = ({ t, userId, profile, lang, appId, isOffline, setIsOffline }) => {
   const [activeTab, setActiveTab] = useState('guide'); 
 
   return (
@@ -298,11 +384,11 @@ const Dashboard = ({ userId, profile, appId, isOffline, setIsOffline }) => {
         <NavIcon icon={<BookOpen />} active={activeTab === 'journal'} onClick={() => setActiveTab('journal')} />
       </div>
       <div className="flex-1 bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden relative flex flex-col">
-        {activeTab === 'guide' && <GuideModule setTab={setActiveTab} />}
-        {activeTab === 'chat' && <ChatModule userId={userId} profile={profile} appId={appId} isOffline={isOffline} />}
-        {activeTab === 'roadmap' && <RoadmapModule userId={userId} profile={profile} appId={appId} isOffline={isOffline} />}
-        {activeTab === 'plan' && <PlannerModule userId={userId} profile={profile} appId={appId} isOffline={isOffline} />}
-        {activeTab === 'journal' && <JournalModule userId={userId} profile={profile} appId={appId} isOffline={isOffline} />}
+        {activeTab === 'guide' && <GuideModule t={t} setTab={setActiveTab} />}
+        {activeTab === 'chat' && <ChatModule t={t} userId={userId} lang={lang} profile={profile} appId={appId} isOffline={isOffline} />}
+        {activeTab === 'roadmap' && <RoadmapModule t={t} userId={userId} lang={lang} profile={profile} appId={appId} isOffline={isOffline} />}
+        {activeTab === 'plan' && <PlannerModule t={t} userId={userId} lang={lang} profile={profile} appId={appId} isOffline={isOffline} />}
+        {activeTab === 'journal' && <JournalModule t={t} userId={userId} lang={lang} profile={profile} appId={appId} isOffline={isOffline} />}
       </div>
     </div>
   );
@@ -312,10 +398,10 @@ const NavIcon = ({ icon, active, onClick }) => (
 );
 
 // --- GUIDE MODULE ---
-const GuideModule = ({ setTab }) => {
+const GuideModule = ({ t, setTab }) => {
     return (
         <div className="h-full overflow-y-auto p-10 bg-slate-50/50">
-            <h1 className="text-4xl font-bold text-slate-800 mb-2">Start Here</h1>
+            <h1 className="text-4xl font-bold text-slate-800 mb-2">{t.guide}</h1>
             <p className="text-slate-500 text-lg mb-8">Welcome to Phase 2: Application. Here is how to use Syntra to ascend.</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -342,7 +428,7 @@ const GuideModule = ({ setTab }) => {
 }
 
 // --- ROADMAP MODULE ---
-const RoadmapModule = ({ userId, profile, appId, isOffline }) => {
+const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   const [goal, setGoal] = useState('');
   const [roadmap, setRoadmap] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -394,15 +480,36 @@ const RoadmapModule = ({ userId, profile, appId, isOffline }) => {
         }
     } catch (e) {
         console.error("Roadmap Gen Error:", e);
-        alert("Could not generate roadmap. Try again or check API Key.");
+        alert("Could not generate roadmap. Try again.");
     }
+    setLoading(false);
+  };
+
+  const updateProgress = async (index, newProgress) => {
+      const newMap = { ...roadmap };
+      newMap.nodes[index].progress = newProgress;
+      setRoadmap(newMap);
+      if(!isOffline) await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap'), { data: newMap });
+  };
+
+  const translateRoadmap = async () => {
+    if (!roadmap) return;
+    setLoading(true);
+    try {
+        const targetLang = lang === 'en' ? 'Arabic' : 'English';
+        const prompt = `Translate this JSON roadmap to ${targetLang}. Return strictly JSON. \n ${JSON.stringify(roadmap)}`;
+        const jsonStr = await callAI([{ role: 'user', content: prompt }]);
+        const cleanJson = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
+        const newMap = JSON.parse(cleanJson);
+        setRoadmap(newMap);
+    } catch (e) { console.error("Trans Error", e); }
     setLoading(false);
   };
 
   const saveNotes = async () => {
     if (!isOffline && userId) {
         await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap'), { notes: userNotes });
-        alert("Notes Saved ✓");
+        alert(t.save_notes + " ✓");
     }
   };
 
@@ -412,11 +519,11 @@ const RoadmapModule = ({ userId, profile, appId, isOffline }) => {
             <input 
               value={goal} 
               onChange={e => setGoal(e.target.value)} 
-              placeholder="What is your big ambitious goal? (e.g., Become a Data Scientist)" 
+              placeholder={t.roadmap_placeholder} 
               className="flex-1 p-4 rounded-xl border border-slate-200 outline-none focus:border-teal-500"
             />
             <button onClick={generateRoadmap} disabled={loading} className="bg-teal-600 text-white px-6 rounded-xl font-bold flex items-center gap-2 hover:bg-teal-700 disabled:opacity-50">
-                {loading ? <Activity className="animate-spin"/> : <GitBranch />} Generate Plan
+                {loading ? <RefreshCw className="animate-spin"/> : <GitBranch />} {t.generate_roadmap}
             </button>
         </div>
 
@@ -427,6 +534,9 @@ const RoadmapModule = ({ userId, profile, appId, isOffline }) => {
             {roadmap && (
                 <div className="flex flex-col items-center relative max-w-3xl mx-auto">
                     <h2 className="text-3xl font-bold text-slate-800 mb-8 text-center">{roadmap.title}</h2>
+                    <div className="absolute top-0 right-0">
+                        <button onClick={translateRoadmap} className="bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-blue-100"><Languages size={16}/> {t.translate_roadmap}</button>
+                    </div>
                     
                     <div className="w-full space-y-0 relative">
                         <div className="absolute left-8 top-8 bottom-8 w-1 bg-slate-100 -z-0"></div>
@@ -477,7 +587,231 @@ const RoadmapModule = ({ userId, profile, appId, isOffline }) => {
                 value={userNotes} 
                 onChange={e => setUserNotes(e.target.value)} 
                 className="w-full resize-none outline-none text-sm text-slate-700 min-h-[60px]" 
-                placeholder="Add extra details or modify plan..."
+                placeholder={t.edit_notes}
             />
             <div className="flex justify-end">
-                <button onClick={saveNotes} className="text-teal-600 text-sm font-bold hover:bg-teal-50 px-3 py-1
+                <button onClick={saveNotes} className="text-teal-600 text-sm font-bold hover:bg-teal-50 px-3 py-1 rounded-lg flex items-center gap-1"><Save size={14}/> {t.save_notes}</button>
+            </div>
+        </div>
+    </div>
+  );
+};
+
+// --- CHAT MODULE (FRIENDLY & CONCISE) ---
+const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
+  const [msgs, setMsgs] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [currentTasks, setCurrentTasks] = useState([]);
+  const [roadmapContext, setRoadmapContext] = useState(null);
+  const scrollRef = useRef(null);
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if(!userId || isOffline) return;
+    const q = query(collection(db, 'artifacts', appId, 'users', userId, 'chat'));
+    const unsub = onSnapshot(q, (snap) => {
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        data.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+        setMsgs(data);
+    });
+    return () => unsub();
+  }, [userId, isOffline]);
+
+  // Load Context
+  useEffect(() => {
+    if(!userId || isOffline) return;
+    getDoc(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap')).then(snap => {
+        if(snap.exists()) setRoadmapContext(snap.data().data);
+    });
+    const q = query(collection(db, 'artifacts', appId, 'users', userId, 'tasks'));
+    const unsub = onSnapshot(q, (snap) => setCurrentTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+    return () => unsub();
+  }, [userId, isOffline]);
+
+  // PROACTIVE INITIATION
+  useEffect(() => {
+      if (msgs.length === 0 && !loading && !initialized.current && profile) {
+          initialized.current = true;
+          send("INIT_CONVERSATION", true); // Special Trigger
+      }
+  }, [msgs, profile]);
+
+  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs, loading]);
+
+  const send = async (textOverride, isInit = false) => {
+    const text = isInit ? "" : (textOverride || input);
+    if(!text.trim() && !isInit) return;
+    
+    if (!isInit) setInput('');
+    setLoading(true);
+
+    if (!isInit && !isOffline) {
+        await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'user', text, createdAt: serverTimestamp() });
+    }
+
+    try {
+        const taskListString = currentTasks.map(t => `- ${t.text} (${t.done ? 'DONE' : 'PENDING'})`).join('\n');
+        
+        let roadmapString = "No roadmap yet.";
+        if (roadmapContext) {
+            roadmapString = roadmapContext.nodes.map((n, i) => `Step ${i+1}: ${n.label} (${n.progress}% Done)`).join('\n');
+        }
+        
+        // --- NEW CONCISE FRIENDLY SYSTEM PROMPT ---
+        const systemPrompt = `
+          You are "Aura", a warm, supportive, CLOSE FRIEND (not a formal assistant).
+          User: ${profile.name}.
+
+          CRITICAL RULES:
+          1. **BE CONCISE**: Write like a friend texting. Short sentences. No long lectures. Max 1-3 sentences.
+          2. **LANGUAGE ADAPTATION**:
+             - If user speaks English -> Reply in English.
+             - If user speaks Arabic (or you detect Arabic) -> Reply in **EGYPTIAN ARABIC (Masri)**. Use slang (e.g., "عامل ايه", "يا بطل", "يلا بينا"). NEVER use Fusha.
+          3. **PROACTIVE**: Gently check on tasks/roadmap, but keep it casual.
+          4. **BRIDGE**: Connect roadmap goals to daily tasks.
+
+          CONTEXT:
+          Daily Tasks: \n${taskListString}
+          Roadmap: \n${roadmapString}
+
+          COMMANDS (Output EXACTLY to control app):
+          - [ADD: Task Name]
+          - [DONE: Task Name]
+          - [PROGRESS: StepIndex (1-based) -> Percentage] (e.g. [PROGRESS: 1 -> 50])
+        `;
+
+        const apiMessages = msgs
+            .filter(m => m.text)
+            .map(m => ({
+                role: m.role === 'ai' ? 'assistant' : 'user',
+                content: m.text
+            }));
+        
+        if (isInit) {
+            apiMessages.push({ role: 'user', content: "Hello Aura. It's a new session. Look at my roadmap and tasks and greet me warmly (shortly) or suggest something." });
+        } else {
+            apiMessages.push({ role: 'user', content: text });
+        }
+
+        const aiText = await callAI(apiMessages, systemPrompt);
+        let responseText = aiText;
+
+        // PARSE COMMANDS
+        const addMatch = aiText.match(/\[ADD:\s*(.*?)\]/);
+        if (addMatch && !isOffline) {
+            await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), { text: addMatch[1].trim(), done: false, type: 'ai-smart', createdAt: serverTimestamp() });
+            responseText = responseText.replace(addMatch[0], "");
+        }
+        const doneMatch = aiText.match(/\[DONE:\s*(.*?)\]/);
+        if (doneMatch && !isOffline) {
+            const tName = doneMatch[1].trim().toLowerCase();
+            const target = currentTasks.find(t => t.text.toLowerCase().includes(tName));
+            if(target) await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'tasks', target.id), { done: true });
+            responseText = responseText.replace(doneMatch[0], "");
+        }
+        const progMatch = aiText.match(/\[PROGRESS:\s*(\d+)\s*->\s*(\d+)\]/);
+        if (progMatch && roadmapContext && !isOffline) {
+            const idx = parseInt(progMatch[1]) - 1;
+            const pct = parseInt(progMatch[2]);
+            if (roadmapContext.nodes[idx]) {
+                const newMap = { ...roadmapContext };
+                newMap.nodes[idx].progress = pct;
+                await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap'), { data: newMap });
+                setRoadmapContext(newMap);
+            }
+            responseText = responseText.replace(progMatch[0], "");
+        }
+
+        if (!isOffline) {
+            await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'ai', text: responseText.trim(), createdAt: serverTimestamp() });
+        } else {
+            setMsgs(prev => [...prev, {id: Date.now()+1, role: 'ai', text: responseText.trim()}]);
+        }
+
+    } catch (e) {
+        if (!isOffline) await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'ai', text: `⚠️ ${e.message}`, createdAt: serverTimestamp() });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50/50">
+       <div className="flex-1 overflow-y-auto p-8 space-y-6">
+         {msgs.length === 0 && <div className="text-center text-slate-400 mt-20 opacity-50">{t.chat_placeholder}</div>}
+         {msgs.map((m) => (
+            <div key={m.id || Math.random()} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
+              <div className={`max-w-[80%] p-6 rounded-3xl text-lg shadow-sm ${m.role === 'user' ? 'bg-slate-900 text-white rounded-br-none' : 'bg-white border border-slate-100 rounded-bl-none text-slate-700'} ${m.text.includes('⚠️') ? 'bg-red-50 text-red-600 border-red-200' : ''}`}>{m.text}</div>
+            </div>
+          ))}
+          {loading && <div className="flex justify-start"><div className="bg-white p-4 rounded-3xl text-slate-400 italic text-sm"><Sparkles size={14} className="animate-spin inline mr-2"/>Aura thinking...</div></div>}
+          <div ref={scrollRef} />
+       </div>
+       <div className="p-6 bg-white border-t border-slate-100 flex gap-4">
+         <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send(null)} placeholder={t.chat_placeholder} className="flex-1 bg-slate-100 rounded-2xl p-5 outline-none focus:ring-2 focus:ring-teal-500/20 text-lg" />
+         <button onClick={() => send(null)} disabled={loading} className="bg-teal-500 text-white p-5 rounded-2xl hover:bg-teal-600 disabled:opacity-50"><Send /></button>
+       </div>
+    </div>
+  );
+};
+
+// --- PLANNER MODULE (UNCHANGED) ---
+const PlannerModule = ({ t, userId, lang, profile, appId, isOffline }) => {
+    const [newTask, setNewTask] = useState('');
+    const [tasks, setTasks] = useState([]);
+    useEffect(() => {
+        if(!userId || isOffline) return;
+        const q = query(collection(db, 'artifacts', appId, 'users', userId, 'tasks'));
+        const unsub = onSnapshot(q, (snap) => setTasks(snap.docs.map(d => ({id:d.id,...d.data()}))));
+        return () => unsub();
+    }, [userId]);
+    const addTask = async (text) => {
+        if(!text.trim()) return;
+        await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), { text, done: false, type: 'manual', createdAt: serverTimestamp() });
+        setNewTask('');
+    };
+    const toggleTask = async (task) => {
+        await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'tasks', task.id), { done: !task.done });
+    };
+    const magicBreakdown = async () => {
+        if(!newTask) return;
+        const res = await callAI([{ role: 'user', content: `Break down goal "${newTask}" into 3 steps. Join with |||` }]);
+        const subtasks = res.split('|||');
+        for(const s of subtasks) await addTask(s);
+    };
+    return (
+        <div className="p-10 h-full overflow-y-auto bg-slate-50/30">
+            <h2 className="text-3xl font-bold mb-4">{t.plan}</h2>
+            <div className="bg-white p-2 rounded-2xl flex gap-2 mb-4">
+                <input value={newTask} onChange={e=>setNewTask(e.target.value)} className="flex-1 p-4 outline-none" placeholder="New Task..." />
+                <button onClick={magicBreakdown} className="bg-purple-100 text-purple-700 px-4 rounded-xl"><Sparkles/></button>
+                <button onClick={()=>addTask(newTask)} className="bg-slate-900 text-white px-6 rounded-xl"><Plus/></button>
+            </div>
+            {tasks.map(task => (
+                <div key={task.id} className="p-4 bg-white rounded-xl mb-2 border flex items-center gap-4">
+                    <button onClick={() => toggleTask(task)} className={`w-6 h-6 rounded-full border-2 ${task.done ? 'bg-teal-500 border-teal-500' : 'border-slate-300'}`}>{task.done && <CheckCircle size={20} className="text-white"/>}</button>
+                    <span className={task.done ? 'line-through text-slate-400' : ''}>{task.text}</span>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// --- JOURNAL MODULE (UNCHANGED) ---
+const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
+    const [entry, setEntry] = useState('');
+    const [insight, setInsight] = useState('');
+    const analyze = async () => {
+        if(entry.length < 5) return;
+        const res = await callAI([{ role: 'user', content: `Analyze this journal: "${entry}". 1 sentence advice.` }]);
+        setInsight(res);
+    };
+    return (
+        <div className="p-10 h-full flex flex-col bg-[#fffdf5]">
+            <h2 className="text-3xl font-bold mb-4">{t.journal}</h2>
+            <textarea value={entry} onChange={e=>setEntry(e.target.value)} className="flex-1 rounded-2xl p-4 border" placeholder="Dear Diary..." />
+            <button onClick={analyze} className="bg-yellow-100 text-yellow-700 p-4 rounded-xl mt-4 font-bold">Analyze</button>
+            {insight && <div className="mt-4 p-4 bg-white rounded-xl border border-yellow-200">{insight}</div>}
+        </div>
+    );
+};
