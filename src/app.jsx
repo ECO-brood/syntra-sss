@@ -23,7 +23,7 @@ import {
 // 1. GEMINI API KEY (FIXED FOR VITE)
 // IMPORTANT: Create a .env file with VITE_GEMINI_API_KEY=your_key 
 // OR replace "YOUR_API_KEY_HERE" below with your actual key string.
-const apiKey = import.meta.env.GEMINI_API_KEY || "AIzaSyCyo02bUMdw_6x7-kCzOHCOiKYMmZLJ-R0";
+const apiKey = "AIzaSyCyo02bUMdw_6x7-kCzOHCOiKYMmZLJ-R0";
 
 // 2. FIREBASE CONFIGURATION
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -891,3 +891,4 @@ const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
     </div>
   );
 }
+
