@@ -427,7 +427,7 @@ const GuideModule = ({ t, setTab }) => {
     );
 }
 
-// --- ROADMAP MODULE (UPDATED WITH PERCENTAGE) ---
+// --- ROADMAP MODULE ---
 const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   const [goal, setGoal] = useState('');
   const [roadmap, setRoadmap] = useState(null);
@@ -597,7 +597,7 @@ const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   );
 };
 
-// --- CHAT MODULE (PROACTIVE & CONNECTED) ---
+// --- CHAT MODULE (FRIENDLY & CONCISE) ---
 const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState('');
@@ -658,20 +658,24 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
             roadmapString = roadmapContext.nodes.map((n, i) => `Step ${i+1}: ${n.label} (${n.progress}% Done)`).join('\n');
         }
         
+        // --- NEW CONCISE FRIENDLY SYSTEM PROMPT ---
         const systemPrompt = `
-          You are "Aura", a warm, proactive companion. User: ${profile.name}.
-          Language: ${lang === 'ar' ? 'Egyptian Arabic' : 'English'}.
-          
-          MISSION:
-          1. **PROACTIVE:** If this is the start (INIT_CONVERSATION), greet the user warmly and suggest a task based on the Roadmap or ask for plans.
-          2. **BRIDGE:** Look at the "Big Roadmap" and "Daily Tasks". If a roadmap step has low progress, suggest adding a daily task for it.
-          3. **UPDATE PROGRESS:** If user says "I did half of Step 1", update progress.
-          
+          You are "Aura", a warm, supportive, CLOSE FRIEND (not a formal assistant).
+          User: ${profile.name}.
+
+          CRITICAL RULES:
+          1. **BE CONCISE**: Write like a friend texting. Short sentences. No long lectures. Max 1-3 sentences.
+          2. **LANGUAGE ADAPTATION**:
+             - If user speaks English -> Reply in English.
+             - If user speaks Arabic (or you detect Arabic) -> Reply in **EGYPTIAN ARABIC (Masri)**. Use slang (e.g., "عامل ايه", "يا بطل", "يلا بينا"). NEVER use Fusha.
+          3. **PROACTIVE**: Gently check on tasks/roadmap, but keep it casual.
+          4. **BRIDGE**: Connect roadmap goals to daily tasks.
+
           CONTEXT:
           Daily Tasks: \n${taskListString}
-          Roadmap Progress: \n${roadmapString}
+          Roadmap: \n${roadmapString}
 
-          COMMANDS (Strict Output):
+          COMMANDS (Output EXACTLY to control app):
           - [ADD: Task Name]
           - [DONE: Task Name]
           - [PROGRESS: StepIndex (1-based) -> Percentage] (e.g. [PROGRESS: 1 -> 50])
@@ -685,7 +689,7 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
             }));
         
         if (isInit) {
-            apiMessages.push({ role: 'user', content: "Hello Aura. It's a new session. Look at my roadmap and tasks and greet me or suggest something." });
+            apiMessages.push({ role: 'user', content: "Hello Aura. It's a new session. Look at my roadmap and tasks and greet me warmly (shortly) or suggest something." });
         } else {
             apiMessages.push({ role: 'user', content: text });
         }
@@ -694,13 +698,11 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
         let responseText = aiText;
 
         // PARSE COMMANDS
-        // 1. ADD
         const addMatch = aiText.match(/\[ADD:\s*(.*?)\]/);
         if (addMatch && !isOffline) {
             await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), { text: addMatch[1].trim(), done: false, type: 'ai-smart', createdAt: serverTimestamp() });
             responseText = responseText.replace(addMatch[0], "");
         }
-        // 2. DONE
         const doneMatch = aiText.match(/\[DONE:\s*(.*?)\]/);
         if (doneMatch && !isOffline) {
             const tName = doneMatch[1].trim().toLowerCase();
@@ -708,7 +710,6 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
             if(target) await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'tasks', target.id), { done: true });
             responseText = responseText.replace(doneMatch[0], "");
         }
-        // 3. PROGRESS
         const progMatch = aiText.match(/\[PROGRESS:\s*(\d+)\s*->\s*(\d+)\]/);
         if (progMatch && roadmapContext && !isOffline) {
             const idx = parseInt(progMatch[1]) - 1;
@@ -717,7 +718,7 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
                 const newMap = { ...roadmapContext };
                 newMap.nodes[idx].progress = pct;
                 await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap'), { data: newMap });
-                setRoadmapContext(newMap); // Local update
+                setRoadmapContext(newMap);
             }
             responseText = responseText.replace(progMatch[0], "");
         }
