@@ -22,7 +22,7 @@ import {
 
 // 1. GEMINI API KEY
 // Ensure this key has the "Generative Language API" enabled in Google Cloud Console.
-const apiKey = "AIzaSyB7zq3t010PKDcZHVr2bKqpD6xk-kkh4Kg";
+const apiKey = "AIzaSyDSSYaYfnWofHcNCch0XsGb9mOBalqtJyg";
 
 // 2. FIREBASE CONFIGURATION
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -911,4 +911,5 @@ const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
     </div>
   );
 }
+
 
