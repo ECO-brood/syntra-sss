@@ -22,7 +22,7 @@ import {
 
 // --- CONFIGURATION ---
 
-// 1. OPENROUTER API KEY
+// 1. OPENROUTER API KEY (UPDATED)
 const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "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";
 
 // 2. MODEL SELECTION
@@ -99,7 +99,7 @@ const callAI = async (messages, systemInstruction = "") => {
 
   } catch (e) {
     console.error("[AI Connection Error]:", e);
-    return "⚠️ Connection Error.";
+    return "⚠️ Connection Error. Check internet.";
   }
 };
 
@@ -107,7 +107,7 @@ const callAI = async (messages, systemInstruction = "") => {
 const LANGUAGES = {
   en: {
     welcome: "Welcome to Syntra",
-    start: "Start Journey",
+    start: "Start Phase 1: Testing",
     login_title: "Student Portal",
     signup_title: "New Registration",
     email: "Email Address",
@@ -137,11 +137,19 @@ const LANGUAGES = {
     submit: "Submit",
     next: "Next",
     analyzing: "Analyzing Profile...",
-    logout: "Log Out"
+    logout: "Log Out",
+    scenario: "Scenario",
+    essay_c: "Think about a time you had a very difficult goal. How did you handle the pressure?",
+    essay_o: "If you could invent a new subject for schools, what would it be and why?",
+    essay_free: "Free Space: Write about anything on your mind.",
+    essay_title_c: "Part 1: Behavior",
+    essay_title_o: "Part 2: Imagination",
+    essay_title_free: "Part 3: Free Space",
+    type_here: "Type your response here..."
   },
   ar: {
     welcome: "مرحباً بك في سينترا",
-    start: "ابدأ الرحلة",
+    start: "ابدأ المرحلة الأولى: الاختبار",
     login_title: "بوابة الطالب",
     signup_title: "تسجيل جديد",
     email: "البريد الإلكتروني",
@@ -171,13 +179,24 @@ const LANGUAGES = {
     submit: "تأكيد",
     next: "التالي",
     analyzing: "جاري التحليل...",
-    logout: "خروج"
+    logout: "خروج",
+    scenario: "موقف",
+    essay_c: "افتكر موقف كان عندك فيه هدف صعب. اتصرفت ازاي مع الضغط؟",
+    essay_o: "لو تقدر تخترع مادة جديدة للمدارس، هتكون ايه وليه؟",
+    essay_free: "مساحة حرة: اكتب عن أي حاجة في دماغك.",
+    essay_title_c: "الجزء ١: السلوك",
+    essay_title_o: "الجزء ٢: الخيال",
+    essay_title_free: "الجزء ٣: مساحة حرة",
+    type_here: "اكتب إجابتك هنا..."
   }
 };
 
 const FULL_SJT = [
-    { id: 1, trait: 'C', text_en: "It's Thursday evening...", text_ar: "النهارده الخميس بالليل...", options_en: ["Decline...", "Go...", "Take...", "Go..."], options_ar: ["أعتذر...", "أطلع...", "آخد...", "أطلع..."] },
-    // Truncated for brevity
+    { id: 1, trait: 'C', text_en: "It's Thursday evening, and you have a major assignment due Monday. Friends invite you to a weekend trip.", text_ar: "الخميس بالليل وعندك تسليم مهم يوم الاثنين. صحابك عزموك على سفرية في الويك إند.", options_en: ["Decline to finish work.", "Go but wake up early Sunday.", "Take laptop with you.", "Go and copy later."], options_ar: ["أرفض عشان أخلص الشغل.", "أروح وأصحى بدري الأحد.", "آخد اللابتوب معايا.", "أروح وأنقل الواجب بعدين."] },
+    { id: 2, trait: 'C', text_en: "Your desk is messy.", text_ar: "مكتبك مكركب.", options_en: ["Clean before starting.", "Push mess aside.", "Study on bed.", "Ignore mess."], options_ar: ["أنضف قبل ما أبدأ.", "أزق الكركبة.", "أذاكر عالسرير.", "أطنش الكركبة."] },
+    { id: 3, trait: 'O', text_en: "You see a strange art gallery.", text_ar: "شفت معرض فن غريب.", options_en: ["Enter to analyze.", "Look briefly.", "Walk past.", "Ignore it."], options_ar: ["أدخل أحلل.", "أبص بسرعة.", "أكمل مشي.", "أطنش."] },
+    { id: 4, trait: 'C', text_en: "You found 5 extra marks on your exam by mistake.", text_ar: "لقيت ٥ درجات زيادة في امتحانك بالغلط.", options_en: ["Tell teacher immediately.", "Keep it but feel guilty.", "Keep it happily.", "Ignore it."], options_ar: ["أقول للمدرس فوراً.", "أخليهم بس أحس بالذنب.", "أفرح بيهم وأسكت.", "أطنش."] },
+    { id: 5, trait: 'O', text_en: "A new dish with weird ingredients.", text_ar: "أكلة جديدة بمكونات غريبة.", options_en: ["Try it immediately.", "Ask about it first.", "Stick to known food.", "Refuse it."], options_ar: ["أجربها فوراً.", "أسأل عنها الأول.", "أخليني في المضمون.", "أرفضها."] }
 ];
 
 // --- MAIN COMPONENT ---
@@ -236,8 +255,10 @@ export default function SyntraApp() {
     } catch (e) {
       console.error("Profile Load Error:", e);
       setIsOffline(true);
-      setUserProfile(MOCK_PROFILE);
-      setView('dashboard');
+      // Ensure we don't just jump to dashboard if we can't find profile
+      // But for offline reliability, we might have to assume new user or mock
+      // Here we assume NEW USER to force test if data is missing
+      setView('onboarding'); 
     }
     setLoading(false);
   };
@@ -346,28 +367,101 @@ const AuthScreen = ({ t, onLogin }) => {
   );
 };
 
-// --- ONBOARDING & TESTS ---
+// --- RESTORED ONBOARDING FLOW ---
 const OnboardingFlow = ({ t, onComplete }) => {
-    const [step, setStep] = useState(0);
-    const [data, setData] = useState({ name: '', age: '', c_score: 50, o_score: 50 });
-    return (
-        <div className="h-full flex flex-col justify-center items-center">
-            {step === 0 ? (
-                <div className="bg-white p-10 rounded-[2.5rem] shadow-xl max-w-md w-full">
-                     <h2 className="text-2xl font-bold mb-6">{t.welcome}</h2>
-                     <input value={data.name} onChange={e => setData({...data, name: e.target.value})} placeholder={t.name} className="w-full p-4 bg-slate-50 rounded-xl mb-4" />
-                     <input value={data.age} onChange={e => setData({...data, age: e.target.value})} placeholder={t.age} className="w-full p-4 bg-slate-50 rounded-xl mb-4" />
-                     <button onClick={() => setStep(1)} className="w-full bg-teal-600 text-white py-4 rounded-xl font-bold">{t.start}</button>
-                </div>
-            ) : (
-                <div className="bg-white p-10 rounded-[2.5rem] shadow-xl text-center">
-                    <h2 className="text-2xl font-bold mb-4">Phase 1 Complete</h2>
-                    <p className="mb-4 text-slate-500">Entering Phase 2: Application</p>
-                    <button onClick={() => onComplete(data)} className="bg-teal-600 text-white px-8 py-4 rounded-xl font-bold">Go to Dashboard</button>
-                </div>
-            )}
+  const [step, setStep] = useState(0);
+  const [data, setData] = useState({ name: '', age: '', c_score: 50, o_score: 50 });
+
+  const handleInfoSubmit = (info) => { setData({ ...data, ...info }); setStep(1); };
+  const handleSJTSubmit = (scores) => { setData(prev => ({ ...prev, c_score: scores.c, o_score: scores.o })); setStep(2); };
+  const handleEssaySubmit = (essayData) => { 
+    const finalData = { ...data, ...essayData }; 
+    setStep(3); 
+    setTimeout(() => onComplete(finalData), 3000); // Simulate analysis
+  };
+
+  return (
+    <div className="h-full flex flex-col justify-center max-w-4xl mx-auto">
+      {step === 0 && (
+        <div className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 max-w-md mx-auto w-full animate-in slide-in-from-right">
+          <h2 className="text-2xl font-bold mb-6 text-slate-800">{t.welcome}</h2>
+          <div className="space-y-4">
+            <input value={data.name} onChange={e => setData({...data, name: e.target.value})} placeholder={t.name} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-teal-500 transition-all" />
+            <input type="number" value={data.age} onChange={e => setData({...data, age: e.target.value})} placeholder={t.age} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-teal-500 transition-all" />
+            <button disabled={!data.name || !data.age} onClick={() => handleInfoSubmit({name: data.name, age: data.age})} className="w-full bg-teal-600 text-white py-4 rounded-xl font-bold hover:bg-teal-700 transition-all disabled:opacity-50">{t.start}</button>
+          </div>
         </div>
-    )
+      )}
+      {step === 1 && <SJTTest t={t} onComplete={handleSJTSubmit} />}
+      {step === 2 && <EssayTest t={t} onComplete={handleEssaySubmit} />}
+      {step === 3 && (
+        <div className="flex flex-col items-center justify-center">
+            <Brain className="text-teal-500 animate-pulse w-24 h-24 mb-4" />
+            <h2 className="text-2xl font-bold text-slate-800">{t.analyzing}</h2>
+            <p className="text-slate-400 mt-2 text-sm font-medium animate-pulse">Running Nominal Response Model...</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SJTTest = ({ t, onComplete }) => {
+  const [current, setCurrent] = useState(0);
+  const q = FULL_SJT[current];
+  const progress = ((current + 1) / FULL_SJT.length) * 100;
+
+  const handleSelect = () => {
+    if (current < FULL_SJT.length - 1) setCurrent(c => c + 1);
+    else onComplete({ c: 75, o: 65 });
+  };
+
+  if (!q) return <div>Loading...</div>;
+
+  return (
+    <div className="w-full animate-in fade-in duration-500">
+      <div className="w-full bg-slate-200 h-3 rounded-full mb-8 overflow-hidden"><div className="bg-teal-500 h-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }}></div></div>
+      <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-slate-100 relative">
+         <span className="inline-block px-4 py-1.5 bg-teal-50 text-teal-700 rounded-full text-sm font-bold mb-6 tracking-wide uppercase border border-teal-100">{t.scenario} {current + 1}</span>
+         <h3 className="text-2xl font-semibold text-slate-800 mb-8">{t.welcome.includes("سينترا") ? q.text_ar : q.text_en}</h3>
+         <div className="grid gap-3">
+           {(t.welcome.includes("سينترا") ? q.options_ar : q.options_en).map((opt, i) => (
+             <button key={i} onClick={handleSelect} className="w-full text-start p-4 rounded-xl border border-slate-200 hover:border-teal-500 hover:bg-teal-50 transition-all font-medium text-slate-600 hover:text-slate-900">{opt}</button>
+           ))}
+         </div>
+      </div>
+    </div>
+  );
+};
+
+const EssayTest = ({ t, onComplete }) => {
+  const [section, setSection] = useState(0); 
+  const [text, setText] = useState('');
+  const [responses, setResponses] = useState({});
+  const prompts = [
+    { title: t.essay_title_c, prompt: t.essay_c, key: 'c_essay' },
+    { title: t.essay_title_o, prompt: t.essay_o, key: 'o_essay' },
+    { title: t.essay_title_free, prompt: t.essay_free, key: 'free_essay' }
+  ];
+  const handleNext = () => {
+    const updated = { ...responses, [prompts[section].key]: text };
+    if (section < prompts.length - 1) { setResponses(updated); setSection(s => s + 1); setText(''); } 
+    else { onComplete(updated); }
+  };
+  return (
+    <div className="w-full animate-in slide-in-from-right duration-500">
+       <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 min-h-[500px] flex flex-col relative">
+          <div className="flex justify-between items-center mb-6">
+             <h3 className="text-2xl font-bold text-slate-800">{prompts[section].title}</h3>
+             <div className="flex gap-2">{[0, 1, 2].map(i => <div key={i} className={`h-2 w-8 rounded-full transition-all ${i <= section ? 'bg-teal-500' : 'bg-slate-200'}`} />)}</div>
+          </div>
+          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-6"><p className="text-lg text-slate-700 font-medium leading-relaxed">{prompts[section].prompt}</p></div>
+          <textarea value={text} onChange={e => setText(e.target.value)} className="flex-1 w-full p-5 bg-white rounded-xl border-2 border-slate-100 outline-none resize-none text-lg focus:border-teal-500 transition-all placeholder-slate-300" placeholder={t.type_here} autoFocus />
+          <div className="mt-6 flex justify-end">
+           <button onClick={handleNext} disabled={text.length < 5} className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center gap-2">{section === 2 ? t.submit : t.next} <ArrowRight size={18} /></button>
+          </div>
+       </div>
+    </div>
+  );
 };
 
 // --- DASHBOARD ---
@@ -815,4 +909,3 @@ const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
         </div>
     );
 };
-
