@@ -5,7 +5,8 @@ import {
   Plus, Trash2, Smile, Activity, Lightbulb, LogOut, Lock, Mail, 
   UserCircle, PenTool, ShieldCheck, Cloud, RefreshCw, Bell, 
   WifiOff, Map, GitBranch, Edit3, Save, Languages, Compass,
-  CheckSquare, Book, Link as LinkIcon, ExternalLink, PlayCircle
+  CheckSquare, Book, Link as LinkIcon, ExternalLink, PlayCircle,
+  PieChart, TrendingUp
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -24,7 +25,7 @@ import {
 // 1. OPENROUTER API KEY
 const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "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";
 
-// 2. MODEL SELECTION (GPT-4o for complex logic)
+// 2. MODEL SELECTION
 const AI_MODEL = "openai/gpt-4o"; 
 
 // 3. FIREBASE CONFIGURATION
@@ -83,7 +84,7 @@ const callAI = async (messages, systemInstruction = "") => {
         model: AI_MODEL,
         messages: apiMessages,
         temperature: 0.7, 
-        max_tokens: 3000 // High token limit for long roadmaps
+        max_tokens: 3000
       })
     });
 
@@ -176,7 +177,6 @@ const LANGUAGES = {
 
 const FULL_SJT = [
     { id: 1, trait: 'C', text_en: "It's Thursday evening...", text_ar: "النهارده الخميس بالليل...", options_en: ["Decline...", "Go...", "Take...", "Go..."], options_ar: ["أعتذر...", "أطلع...", "آخد...", "أطلع..."] },
-    // Truncated for brevity
 ];
 
 // --- MAIN COMPONENT ---
@@ -371,7 +371,7 @@ const OnboardingFlow = ({ t, onComplete }) => {
 
 // --- DASHBOARD ---
 const Dashboard = ({ t, userId, profile, lang, appId, isOffline, setIsOffline }) => {
-  const [activeTab, setActiveTab] = useState('guide'); // Default to Guide
+  const [activeTab, setActiveTab] = useState('guide'); 
 
   return (
     <div className="h-full flex gap-6 pb-6 pt-4 animate-in fade-in duration-700 relative">
@@ -396,7 +396,7 @@ const NavIcon = ({ icon, active, onClick }) => (
   <button onClick={onClick} className={`p-4 rounded-2xl transition-all duration-300 ${active ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>{React.cloneElement(icon, { size: 28 })}</button>
 );
 
-// --- GUIDE MODULE (NEW) ---
+// --- GUIDE MODULE ---
 const GuideModule = ({ t, setTab }) => {
     return (
         <div className="h-full overflow-y-auto p-10 bg-slate-50/50">
@@ -407,34 +407,20 @@ const GuideModule = ({ t, setTab }) => {
                 <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => setTab('chat')}>
                     <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center text-teal-600 mb-4"><MessageCircle /></div>
                     <h3 className="text-xl font-bold mb-2">Aura: Your Daily Companion</h3>
-                    <p className="text-slate-500">Aura acts like a caring friend. Talk to her daily! She will automatically organize your planner and check on your roadmap progress.</p>
-                    <div className="mt-4 text-teal-600 font-bold text-sm flex items-center gap-1">Open Chat <ArrowRight size={16}/></div>
+                    <p className="text-slate-500">Aura initiates chats to keep you on track. Tell her what you finished, and she updates your stats automatically!</p>
                 </div>
 
                 <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => setTab('roadmap')}>
                     <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-4"><Map /></div>
                     <h3 className="text-xl font-bold mb-2">Goal Roadmap Visualizer</h3>
-                    <p className="text-slate-500">Visualize ambitious goals (like "Learn AI" or "Study Medicine"). Generate a 20-step flowchart with study resources.</p>
-                    <div className="mt-4 text-indigo-600 font-bold text-sm flex items-center gap-1">Create Plan <ArrowRight size={16}/></div>
-                </div>
-
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => setTab('plan')}>
-                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 mb-4"><Calendar /></div>
-                    <h3 className="text-xl font-bold mb-2">Smart Planner</h3>
-                    <p className="text-slate-500">Aura populates this automatically when you chat. "I have math homework" becomes a task here instantly.</p>
-                </div>
-
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => setTab('journal')}>
-                    <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center text-yellow-600 mb-4"><BookOpen /></div>
-                    <h3 className="text-xl font-bold mb-2">Neuro Journal</h3>
-                    <p className="text-slate-500">Reflect on your day. Syntra analyzes your entries to understand your mental state better.</p>
+                    <p className="text-slate-500">Track granular progress (0-100%) for each step of your big goals. Aura updates this based on your chat.</p>
                 </div>
             </div>
         </div>
     );
 }
 
-// --- ROADMAP MODULE (UPDATED FLOWCHART) ---
+// --- ROADMAP MODULE (UPDATED WITH PERCENTAGE) ---
 const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   const [goal, setGoal] = useState('');
   const [roadmap, setRoadmap] = useState(null);
@@ -462,13 +448,12 @@ const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
     setLoading(true);
     try {
         const prompt = `
-          Create a MASSIVE, DETAILED study roadmap for ${profile.name} (Age ${profile.age}, Grade 11/12).
+          Create a detailed, visual study roadmap for ${profile.name} (Age ${profile.age}).
           GOAL: "${goal}".
-          
           REQUIREMENTS:
-          1. Return valid JSON only. Structure: { "title": "...", "nodes": [ { "id": 1, "label": "...", "details": "...", "resources": ["Book X", "Coursera Y"], "status": "pending" } ] }
-          2. Generate 15-20 steps. Steps should be logical (Beginner -> Advanced).
-          3. Include specific resources (URLs, Book titles) in the "resources" array.
+          1. Return valid JSON only. Structure: { "title": "...", "nodes": [ { "id": 1, "label": "...", "details": "...", "resources": ["..."], "progress": 0 } ] }
+          2. Generate 15-20 steps. Steps should be logical.
+          3. Include "progress" field initialized to 0.
           4. Language: ${lang === 'ar' ? 'Arabic' : 'English'}.
         `;
         
@@ -492,26 +477,11 @@ const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
     setLoading(false);
   };
 
-  const toggleNode = async (index) => {
+  const updateProgress = async (index, newVal) => {
       const newMap = { ...roadmap };
-      const node = newMap.nodes[index];
-      node.status = node.status === 'done' ? 'pending' : 'done';
+      newMap.nodes[index].progress = newVal;
       setRoadmap(newMap);
       if(!isOffline) await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap'), { data: newMap });
-  };
-
-  const translateRoadmap = async () => {
-    if (!roadmap) return;
-    setLoading(true);
-    try {
-        const targetLang = lang === 'en' ? 'Arabic' : 'English';
-        const prompt = `Translate this JSON roadmap to ${targetLang}. Return strictly JSON. \n ${JSON.stringify(roadmap)}`;
-        const jsonStr = await callAI([{ role: 'user', content: prompt }]);
-        const cleanJson = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
-        const newMap = JSON.parse(cleanJson);
-        setRoadmap(newMap);
-    } catch (e) { console.error("Trans Error", e); }
-    setLoading(false);
   };
 
   const saveNotes = async () => {
@@ -520,6 +490,8 @@ const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
         alert(t.save_notes + " ✓");
     }
   };
+
+  const overallProgress = roadmap ? Math.round(roadmap.nodes.reduce((acc, curr) => acc + (curr.progress || 0), 0) / roadmap.nodes.length) : 0;
 
   return (
     <div className="h-full flex flex-col bg-slate-50/50 p-6 overflow-hidden">
@@ -535,38 +507,45 @@ const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
             </button>
         </div>
 
-        {/* Visualizer Area (Flowchart Style) */}
         <div className="flex-1 bg-white rounded-3xl border border-slate-200 overflow-y-auto p-10 relative shadow-inner">
             {!roadmap && <div className="text-center text-slate-400 mt-20 flex flex-col items-center"><Map size={48} className="mb-4 opacity-50"/>Start by entering a big goal above.</div>}
             
             {roadmap && (
                 <div className="flex flex-col items-center relative max-w-3xl mx-auto">
-                    <h2 className="text-3xl font-bold text-slate-800 mb-8 text-center">{roadmap.title}</h2>
-                    <div className="absolute top-0 right-0">
-                        <button onClick={translateRoadmap} className="bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-blue-100"><Languages size={16}/> {t.translate_roadmap}</button>
+                    <div className="flex items-center gap-4 mb-8 w-full justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <h2 className="text-2xl font-bold text-slate-800">{roadmap.title}</h2>
+                        <div className="flex items-center gap-2">
+                            <PieChart className="text-teal-600" />
+                            <span className="text-2xl font-bold text-teal-600">{overallProgress}%</span>
+                        </div>
                     </div>
                     
-                    {/* Vertical Flowchart */}
                     <div className="w-full space-y-0 relative">
-                        {/* Connecting Line Background */}
                         <div className="absolute left-8 top-8 bottom-8 w-1 bg-slate-100 -z-0"></div>
 
                         {roadmap.nodes?.map((node, i) => (
                             <div key={i} className="flex gap-6 relative z-10 group">
-                                {/* Status Checkbox / Node Marker */}
-                                <button 
-                                  onClick={() => toggleNode(i)}
-                                  className={`w-16 h-16 rounded-2xl flex-shrink-0 border-4 flex items-center justify-center transition-all bg-white cursor-pointer ${node.status === 'done' ? 'border-teal-500 text-teal-500' : 'border-slate-200 text-slate-300 hover:border-teal-300'}`}
-                                >
-                                   {node.status === 'done' ? <CheckCircle size={32} /> : <span className="font-bold text-lg">{i+1}</span>}
-                                </button>
+                                <div className={`w-16 h-16 rounded-2xl flex-shrink-0 border-4 flex items-center justify-center bg-white ${node.progress === 100 ? 'border-teal-500 text-teal-500' : 'border-slate-200 text-slate-300'}`}>
+                                   {node.progress === 100 ? <CheckCircle size={32} /> : <span className="font-bold text-lg">{i+1}</span>}
+                                </div>
 
-                                {/* Content Card */}
-                                <div className={`flex-1 p-6 rounded-2xl border mb-8 transition-all ${node.status === 'done' ? 'bg-teal-50 border-teal-100 opacity-75' : 'bg-white border-slate-200 shadow-sm hover:shadow-md'}`}>
-                                    <h3 className={`text-xl font-bold mb-2 ${node.status === 'done' ? 'text-teal-800 line-through' : 'text-slate-800'}`}>{node.label}</h3>
+                                <div className="flex-1 p-6 rounded-2xl border mb-8 bg-white border-slate-200 shadow-sm hover:shadow-md transition-all">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="text-xl font-bold text-slate-800">{node.label}</h3>
+                                        <div className="text-xs font-bold bg-slate-100 px-2 py-1 rounded text-slate-500">{node.progress}% Done</div>
+                                    </div>
                                     <p className="text-slate-600 mb-4">{node.details}</p>
                                     
-                                    {/* Resources */}
+                                    {/* Progress Slider */}
+                                    <div className="mb-4">
+                                        <input 
+                                          type="range" min="0" max="100" step="10" 
+                                          value={node.progress || 0} 
+                                          onChange={(e) => updateProgress(i, parseInt(e.target.value))}
+                                          className="w-full accent-teal-600 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                    </div>
+
                                     {node.resources && node.resources.length > 0 && (
                                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                             <div className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-1"><LinkIcon size={12}/> Study Resources</div>
@@ -587,7 +566,6 @@ const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
             )}
         </div>
 
-        {/* Notes Area */}
         <div className="mt-4 bg-white p-4 rounded-2xl border border-slate-200 flex flex-col gap-2">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2"><Edit3 size={12}/> Your Custom Notes</label>
             <textarea 
@@ -604,7 +582,7 @@ const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   );
 };
 
-// --- CHAT MODULE (UPDATED WITH AUTO-TASKING) ---
+// --- CHAT MODULE (UPDATED WITH INITIATION & CONNECTIVITY) ---
 const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState('');
@@ -624,15 +602,38 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
     return () => unsub();
   }, [userId, isOffline]);
 
+  // Load Roadmap & Tasks for Context
   useEffect(() => {
     if(!userId || isOffline) return;
-    getDoc(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap')).then(snap => {
-        if(snap.exists()) setRoadmapContext(snap.data().data);
+    const roadmapUnsub = onSnapshot(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap'), (doc) => {
+        if(doc.exists()) setRoadmapContext(doc.data().data);
     });
-    const q = query(collection(db, 'artifacts', appId, 'users', userId, 'tasks'));
-    const unsub = onSnapshot(q, (snap) => setCurrentTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
-    return () => unsub();
+    const tasksUnsub = onSnapshot(query(collection(db, 'artifacts', appId, 'users', userId, 'tasks')), (snap) => {
+        setCurrentTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { roadmapUnsub(); tasksUnsub(); };
   }, [userId, isOffline]);
+
+  // --- AUTO-INITIATION LOGIC ---
+  useEffect(() => {
+      if (!loading && msgs.length === 0 && userProfile && roadmapContext) {
+          initiateChat();
+      }
+  }, [msgs.length, userProfile, roadmapContext]);
+
+  const initiateChat = async () => {
+      setLoading(true);
+      const nextStep = roadmapContext?.nodes?.find(n => (n.progress || 0) < 100);
+      const prompt = `
+        User: ${profile.name}.
+        Role: Aura (Supportive friend).
+        Goal: Initiate the chat warmly. Mention the next roadmap step: "${nextStep ? nextStep.label : 'Reviewing Goals'}" and suggest starting it if they are free.
+        Language: ${lang === 'ar' ? 'Egyptian Arabic' : 'English'}.
+      `;
+      const greeting = await callAI([{role: 'user', content: prompt}]);
+      await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'ai', text: greeting, createdAt: serverTimestamp() });
+      setLoading(false);
+  };
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs, loading]);
 
@@ -642,85 +643,81 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
     setInput('');
     setLoading(true);
 
-    if (!isOffline) {
-        await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'user', text, createdAt: serverTimestamp() });
-    } else {
-        setMsgs(prev => [...prev, {id: Date.now(), role: 'user', text}]);
-    }
+    if (!isOffline) await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'user', text, createdAt: serverTimestamp() });
+    else setMsgs(prev => [...prev, {id: Date.now(), role: 'user', text}]);
 
     try {
         const taskListString = currentTasks.map(t => `- ${t.text} (${t.done ? 'DONE' : 'PENDING'})`).join('\n');
         
         let roadmapString = "No roadmap yet.";
         if (roadmapContext) {
-            const nextStep = roadmapContext.nodes.find(n => n.status !== 'done');
-            const total = roadmapContext.nodes.length;
-            const done = roadmapContext.nodes.filter(n => n.status === 'done').length;
-            roadmapString = `Goal: ${roadmapContext.title}. Progress: ${done}/${total}. Next Step: ${nextStep ? nextStep.label : 'Completed'}.`;
+            const nextStep = roadmapContext.nodes.find(n => (n.progress || 0) < 100);
+            roadmapString = `
+              Total Progress: ${Math.round(roadmapContext.nodes.reduce((a,b)=>a+(b.progress||0),0)/roadmapContext.nodes.length)}%.
+              Next Step: ${nextStep ? nextStep.label : 'Completed'}.
+              Nodes: ${roadmapContext.nodes.map(n => `${n.label}: ${n.progress || 0}%`).join(', ')}
+            `;
         }
         
         const systemPrompt = `
-          You are "Aura", a warm, highly supportive companion (like a caring mom or close friend).
-          User: ${profile.name} (Age: ${profile.age}).
+          You are "Aura". Persona: Warm, caring, organized friend.
+          User: ${profile.name}.
           Language: ${lang === 'ar' ? 'Egyptian Arabic' : 'English'}.
           
-          YOUR MISSION:
-          1. Monitor the user's life, study, and mood.
-          2. **AUTO-PLANNER:** If the user mentions a task (e.g., "I have math homework"), automatically add it.
-          3. **AUTO-COMPLETE:** If the user says they finished something, mark it done.
-          4. **ROADMAP TRACKING:** Always gently ask about progress on the "Big Roadmap" if relevant.
-
+          MISSION:
+          1. Connect everything! If user says "I finished Step 1", update the roadmap AND planner.
+          2. Suggest tasks from the Roadmap if the user is free.
+          
           CONTEXT:
-          Current Daily Tasks: \n${taskListString}
-          Big Roadmap Status: \n${roadmapString}
+          Tasks: \n${taskListString}
+          Roadmap: \n${roadmapString}
 
-          COMMANDS (Output these EXACTLY to control the app):
-          - [ADD: Task Name] -> Adds a task to the planner.
-          - [DONE: Task Name] -> Marks a task as done (fuzzy match).
-          - [MOD: Old -> New] -> Renames a task.
+          COMMANDS (Output EXACTLY):
+          - [ADD: Task Name] -> Add task.
+          - [DONE: Task Name] -> Mark task done.
+          - [ROADMAP: "Node Name" -> 50] -> Update node progress to 50%.
         `;
 
-        const apiMessages = msgs
-            .filter(m => m.text)
-            .map(m => ({
-                role: m.role === 'ai' ? 'assistant' : 'user',
-                content: m.text
-            }));
+        const apiMessages = msgs.filter(m => m.text).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text }));
         apiMessages.push({ role: 'user', content: text });
 
         const aiText = await callAI(apiMessages, systemPrompt);
-
-        // --- COMMAND PARSING LOGIC ---
         let responseText = aiText;
 
-        // 1. ADD Task
+        // PARSE COMMANDS
+        // 1. ADD
         const addMatch = aiText.match(/\[ADD:\s*(.*?)\]/);
         if (addMatch && !isOffline) {
-            const newTask = addMatch[1].trim();
-            await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), { text: newTask, done: false, type: 'ai-smart', createdAt: serverTimestamp() });
-            responseText = responseText.replace(addMatch[0], ""); // Remove command from visible chat
+            await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'tasks'), { text: addMatch[1].trim(), done: false, type: 'ai-smart', createdAt: serverTimestamp() });
+            responseText = responseText.replace(addMatch[0], "");
         }
-
-        // 2. DONE Task
+        // 2. DONE
         const doneMatch = aiText.match(/\[DONE:\s*(.*?)\]/);
         if (doneMatch && !isOffline) {
-            const taskToFind = doneMatch[1].trim().toLowerCase();
-            const targetTask = currentTasks.find(t => t.text.toLowerCase().includes(taskToFind));
-            if (targetTask) {
-                await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'tasks', targetTask.id), { done: true });
-            }
+            const target = doneMatch[1].trim().toLowerCase();
+            const task = currentTasks.find(t => t.text.toLowerCase().includes(target));
+            if (task) await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'tasks', task.id), { done: true });
             responseText = responseText.replace(doneMatch[0], "");
         }
-
-        if (!isOffline) {
-            await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'ai', text: responseText.trim(), createdAt: serverTimestamp() });
-        } else {
-            setMsgs(prev => [...prev, {id: Date.now()+1, role: 'ai', text: responseText.trim()}]);
+        // 3. ROADMAP PROGRESS
+        const progMatch = aiText.match(/\[ROADMAP:\s*"(.*?)"\s*->\s*(\d+)\]/);
+        if (progMatch && roadmapContext && !isOffline) {
+            const nodeName = progMatch[1].toLowerCase();
+            const newVal = parseInt(progMatch[2]);
+            const nodeIndex = roadmapContext.nodes.findIndex(n => n.label.toLowerCase().includes(nodeName));
+            if (nodeIndex !== -1) {
+                const newMap = { ...roadmapContext };
+                newMap.nodes[nodeIndex].progress = newVal;
+                await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap'), { data: newMap });
+            }
+            responseText = responseText.replace(progMatch[0], "");
         }
 
+        if (!isOffline) await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'ai', text: responseText.trim(), createdAt: serverTimestamp() });
+        else setMsgs(prev => [...prev, {id: Date.now()+1, role: 'ai', text: responseText.trim()}]);
+
     } catch (e) {
-        const errMsg = e.message;
-        if (!isOffline) await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'ai', text: `⚠️ ${errMsg}`, createdAt: serverTimestamp() });
+        if (!isOffline) await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'chat'), { role: 'ai', text: `⚠️ ${e.message}`, createdAt: serverTimestamp() });
     }
     setLoading(false);
   };
