@@ -6,7 +6,7 @@ import {
   UserCircle, PenTool, ShieldCheck, Cloud, RefreshCw, Bell, 
   WifiOff, Map, GitBranch, Edit3, Save, Languages, Compass,
   CheckSquare, Book, Link as LinkIcon, ExternalLink, PlayCircle,
-  Percent
+  Percent, Target, Zap
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -22,8 +22,8 @@ import {
 
 // --- CONFIGURATION ---
 
-// 1. OPENROUTER API KEY
-const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "AIzaSyAapzo5hjssy4xVHIZ3dVGHHVW31tMiRz4";
+// 1. OPENROUTER API KEY (WARNING: Keep this in .env for production!)
+const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "sk-M52IB1h6pb783wJaciFahRAryfh3oXaT3fgCbCSgVO0Vukbt";
 
 // 2. MODEL SELECTION
 const AI_MODEL = "openai/gpt-4o"; 
@@ -54,7 +54,7 @@ const db = initializeFirestore(app, {
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'syntra-web-v2';
 
 // --- FALLBACK DATA ---
-const MOCK_PROFILE = { name: "Student", age: "18", c_score: 50, o_score: 50 };
+const MOCK_PROFILE = { name: "Student", age: "18", c_score: 75, o_score: 80 };
 
 // --- HELPER: SIMULATED AUTH ID ---
 const getHybridUserId = (email) => {
@@ -119,7 +119,7 @@ const LANGUAGES = {
     guest_btn: "Access Platform",
     switch_signup: "New here? Register",
     switch_login: "Have account? Sign in",
-    guide: "Start Here",
+    guide: "Your Syntra Guide",
     dashboard: "Dashboard",
     chat: "Aura Guide",
     plan: "Smart Planner",
@@ -153,7 +153,7 @@ const LANGUAGES = {
     guest_btn: "دخول المنصة",
     switch_signup: "جديد؟ سجل الآن",
     switch_login: "لديك حساب؟ دخول",
-    guide: "ابدأ هنا",
+    guide: "دليلك في سينترا",
     dashboard: "الرئيسية",
     chat: "المساعد (أورا)",
     plan: "المهام الذكية",
@@ -349,20 +349,23 @@ const AuthScreen = ({ t, onLogin }) => {
 // --- ONBOARDING & TESTS ---
 const OnboardingFlow = ({ t, onComplete }) => {
     const [step, setStep] = useState(0);
-    const [data, setData] = useState({ name: '', age: '', c_score: 50, o_score: 50 });
+    // Keeping mock scores for now until the full SJT flow is wired up
+    const [data, setData] = useState({ name: '', age: '', c_score: 75, o_score: 80 }); 
+    
     return (
         <div className="h-full flex flex-col justify-center items-center">
             {step === 0 ? (
                 <div className="bg-white p-10 rounded-[2.5rem] shadow-xl max-w-md w-full">
                      <h2 className="text-2xl font-bold mb-6">{t.welcome}</h2>
+                     <p className="text-sm text-slate-500 mb-6">Let's set up your profile before we jump into the Situational Judgment Tests (SJT).</p>
                      <input value={data.name} onChange={e => setData({...data, name: e.target.value})} placeholder={t.name} className="w-full p-4 bg-slate-50 rounded-xl mb-4" />
-                     <input value={data.age} onChange={e => setData({...data, age: e.target.value})} placeholder={t.age} className="w-full p-4 bg-slate-50 rounded-xl mb-4" />
+                     <input value={data.age} type="number" onChange={e => setData({...data, age: e.target.value})} placeholder={t.age} className="w-full p-4 bg-slate-50 rounded-xl mb-4" />
                      <button onClick={() => setStep(1)} className="w-full bg-teal-600 text-white py-4 rounded-xl font-bold">{t.start}</button>
                 </div>
             ) : (
                 <div className="bg-white p-10 rounded-[2.5rem] shadow-xl text-center">
-                    <h2 className="text-2xl font-bold mb-4">Phase 1 Complete</h2>
-                    <p className="mb-4 text-slate-500">Entering Phase 2: Application</p>
+                    <h2 className="text-2xl font-bold mb-4">SJT Phase Complete</h2>
+                    <p className="mb-4 text-slate-500">We've gathered your personality insights. Let's see your personalized dashboard.</p>
                     <button onClick={() => onComplete(data)} className="bg-teal-600 text-white px-8 py-4 rounded-xl font-bold">Go to Dashboard</button>
                 </div>
             )}
@@ -384,7 +387,7 @@ const Dashboard = ({ t, userId, profile, lang, appId, isOffline, setIsOffline })
         <NavIcon icon={<BookOpen />} active={activeTab === 'journal'} onClick={() => setActiveTab('journal')} />
       </div>
       <div className="flex-1 bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden relative flex flex-col">
-        {activeTab === 'guide' && <GuideModule t={t} setTab={setActiveTab} />}
+        {activeTab === 'guide' && <GuideModule t={t} setTab={setActiveTab} profile={profile} />}
         {activeTab === 'chat' && <ChatModule t={t} userId={userId} lang={lang} profile={profile} appId={appId} isOffline={isOffline} />}
         {activeTab === 'roadmap' && <RoadmapModule t={t} userId={userId} lang={lang} profile={profile} appId={appId} isOffline={isOffline} />}
         {activeTab === 'plan' && <PlannerModule t={t} userId={userId} lang={lang} profile={profile} appId={appId} isOffline={isOffline} />}
@@ -393,34 +396,91 @@ const Dashboard = ({ t, userId, profile, lang, appId, isOffline, setIsOffline })
     </div>
   );
 };
+
 const NavIcon = ({ icon, active, onClick }) => (
   <button onClick={onClick} className={`p-4 rounded-2xl transition-all duration-300 ${active ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>{React.cloneElement(icon, { size: 28 })}</button>
 );
 
-// --- GUIDE MODULE ---
-const GuideModule = ({ t, setTab }) => {
+// --- GUIDE MODULE (PERSONALIZED) ---
+const GuideModule = ({ t, setTab, profile }) => {
+    // Extract scores safely
+    const oScore = profile?.o_score || 50;
+    const cScore = profile?.c_score || 50;
+    
+    const isHighO = oScore >= 50;
+    const isHighC = cScore >= 50;
+
     return (
         <div className="h-full overflow-y-auto p-10 bg-slate-50/50">
-            <h1 className="text-4xl font-bold text-slate-800 mb-2">{t.guide}</h1>
-            <p className="text-slate-500 text-lg mb-8">Welcome to Phase 2: Application. Here is how to use Syntra to ascend.</p>
+            <h1 className="text-4xl font-bold text-slate-800 mb-2">Hey {profile?.name || "there"}! 👋</h1>
+            <p className="text-slate-500 text-lg mb-8">Based on your SJT results, we've tailored Syntra specifically to how your brain works. Let's break down your unique traits and how you can use them to crush your goals.</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => setTab('chat')}>
-                    <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center text-teal-600 mb-4"><MessageCircle /></div>
-                    <h3 className="text-xl font-bold mb-2">Aura: Proactive Companion</h3>
-                    <p className="text-slate-500">Aura will initiate talks and check your progress. Talk to her to auto-update your Planner and Roadmap.</p>
+            {/* Personality Insights Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                {/* Openness Card */}
+                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-8 rounded-3xl border border-indigo-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center text-white"><Lightbulb size={20}/></div>
+                            <h3 className="text-xl font-bold text-slate-800">Openness (O)</h3>
+                        </div>
+                        <span className="text-2xl font-black text-indigo-300">{oScore}%</span>
+                    </div>
+                    <p className="text-slate-700 font-medium mb-2">
+                        {isHighO ? "You're a creative explorer! 🚀" : "You value practical, proven methods! 🛠️"}
+                    </p>
+                    <p className="text-slate-500 text-sm">
+                        {isHighO 
+                            ? "This means you learn best when things are connected to a bigger picture. You enjoy discovering new concepts rather than just memorizing facts." 
+                            : "This means you thrive on clear, straightforward instructions. You prefer knowing exactly what works so you can execute it perfectly without fluff."}
+                    </p>
                 </div>
 
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => setTab('roadmap')}>
-                    <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-4"><Map /></div>
-                    <h3 className="text-xl font-bold mb-2">Goal Roadmap Visualizer</h3>
-                    <p className="text-slate-500">Visualize ambitious goals. Track percentage completion of every step via Chat.</p>
+                {/* Conscientiousness Card */}
+                <div className="bg-gradient-to-br from-teal-50 to-emerald-50 p-8 rounded-3xl border border-teal-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center text-white"><Target size={20}/></div>
+                            <h3 className="text-xl font-bold text-slate-800">Conscientiousness (C)</h3>
+                        </div>
+                        <span className="text-2xl font-black text-teal-300">{cScore}%</span>
+                    </div>
+                    <p className="text-slate-700 font-medium mb-2">
+                        {isHighC ? "You're a master planner! 📅" : "You're an adaptable adapter! 🌊"}
+                    </p>
+                    <p className="text-slate-500 text-sm">
+                        {isHighC 
+                            ? "Structure is your best friend. You naturally excel when you have a clear schedule, organized notes, and a structured checklist to conquer." 
+                            : "You prefer going with the flow and might find strict schedules suffocating. You work best in bursts of energy when inspiration strikes."}
+                    </p>
+                </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><Zap className="text-yellow-500"/> How to Maximize Syntra for YOU</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => setTab('chat')}>
+                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 mb-4 group-hover:scale-110 transition-transform"><MessageCircle /></div>
+                    <h3 className="text-lg font-bold mb-2">Aura: Your AI Guide</h3>
+                    <p className="text-slate-500 text-sm">
+                        {isHighC ? "Tell Aura about your completed tasks so she can tick them off for you." : "Rely heavily on Aura! Whenever you feel off-track, she'll give you gentle, low-pressure nudges."}
+                    </p>
                 </div>
 
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => setTab('plan')}>
-                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 mb-4"><Calendar /></div>
-                    <h3 className="text-xl font-bold mb-2">Smart Planner</h3>
-                    <p className="text-slate-500">Aura populates this automatically. Just tell her "I have an exam" or "I finished chapter 1".</p>
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => setTab('roadmap')}>
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-4 group-hover:scale-110 transition-transform"><Map /></div>
+                    <h3 className="text-lg font-bold mb-2">Goal Roadmap</h3>
+                    <p className="text-slate-500 text-sm">
+                        {isHighO ? "Use this to map out your wildest, most ambitious dreams. Let it feed your curiosity." : "Use this to break down complex subjects into safe, step-by-step logical paths."}
+                    </p>
+                </div>
+
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => setTab('plan')}>
+                    <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center text-teal-600 mb-4 group-hover:scale-110 transition-transform"><Calendar /></div>
+                    <h3 className="text-lg font-bold mb-2">Smart Planner</h3>
+                    <p className="text-slate-500 text-sm">
+                        {isHighC ? "This is your command center. Use the magic breakdown feature to structure your days perfectly." : "Don't over-stress about this tab. Add a few big tasks and let Aura handle the rest in chat."}
+                    </p>
                 </div>
             </div>
         </div>
@@ -483,13 +543,6 @@ const RoadmapModule = ({ t, userId, lang, profile, appId, isOffline }) => {
         alert("Could not generate roadmap. Try again.");
     }
     setLoading(false);
-  };
-
-  const updateProgress = async (index, newProgress) => {
-      const newMap = { ...roadmap };
-      newMap.nodes[index].progress = newProgress;
-      setRoadmap(newMap);
-      if(!isOffline) await updateDoc(doc(db, 'artifacts', appId, 'users', userId, 'data', 'roadmap'), { data: newMap });
   };
 
   const translateRoadmap = async () => {
@@ -662,6 +715,7 @@ const ChatModule = ({ t, userId, lang, profile, appId, isOffline }) => {
         const systemPrompt = `
           You are "Aura", a warm, supportive, CLOSE FRIEND (not a formal assistant).
           User: ${profile.name}.
+          Personality Context: Openness (${profile.o_score}), Conscientiousness (${profile.c_score}). Frame your advice to suit these scores.
 
           CRITICAL RULES:
           1. **BE CONCISE**: Write like a friend texting. Short sentences. No long lectures. Max 1-3 sentences.
@@ -815,4 +869,3 @@ const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
         </div>
     );
 };
-
