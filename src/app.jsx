@@ -22,11 +22,11 @@ import {
 
 // --- CONFIGURATION ---
 
-// 1. OPENROUTER API KEY (WARNING: Keep this in .env for production!)
-const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || "sk-M52IB1h6pb783wJaciFahRAryfh3oXaT3fgCbCSgVO0Vukbt";
+// 1. OPENAI API KEY (Changed from OpenRouter)
+const apiKey = import.meta.env.VITE_OPENAI_API_KEY || "sk-M52IB1h6pb783wJaciFahRAryfh3oXaT3fgCbCSgVO0Vukbt";
 
 // 2. MODEL SELECTION
-const AI_MODEL = "openai/gpt-4o"; 
+const AI_MODEL = "gpt-4o"; 
 
 // 3. FIREBASE CONFIGURATION
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -62,7 +62,7 @@ const getHybridUserId = (email) => {
   return email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
 };
 
-// --- AI API HELPER ---
+// --- AI API HELPER (UPDATED FOR OPENAI) ---
 const callAI = async (messages, systemInstruction = "") => {
   if (!apiKey || apiKey.includes("PASTE_YOUR")) return "⚠️ Error: API Key is missing.";
 
@@ -72,13 +72,12 @@ const callAI = async (messages, systemInstruction = "") => {
         ...messages
     ];
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    // Switched to OpenAI's official endpoint
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://syntra.app", 
-        "X-Title": "Syntra App"
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: AI_MODEL,
@@ -236,8 +235,8 @@ export default function SyntraApp() {
     } catch (e) {
       console.error("Profile Load Error:", e);
       setIsOffline(true);
-      setUserProfile(MOCK_PROFILE);
-      setView('dashboard');
+      // FIXED: Force into onboarding instead of dashboard if there's an error loading profile (like for guests)
+      setView('onboarding'); 
     }
     setLoading(false);
   };
@@ -403,7 +402,6 @@ const NavIcon = ({ icon, active, onClick }) => (
 
 // --- GUIDE MODULE (PERSONALIZED) ---
 const GuideModule = ({ t, setTab, profile }) => {
-    // Extract scores safely
     const oScore = profile?.o_score || 50;
     const cScore = profile?.c_score || 50;
     
@@ -869,4 +867,3 @@ const JournalModule = ({ t, userId, lang, appId, isOffline }) => {
         </div>
     );
 };
-
